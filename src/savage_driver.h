@@ -263,7 +263,6 @@ typedef struct _Savage {
     int			Chipset;
     int			ChipId;
     int			ChipRev;
-    int			IsPCI;
     vbeInfoPtr		pVbe;
     int			EntityIndex;
     int			ShadowCounter;
@@ -335,6 +334,8 @@ typedef struct _Savage {
     void		(*GetQuiescence)(ScrnInfoPtr pScrn);
 #endif
 
+    Bool		IsPCI;
+    Bool		AgpDMA;
     int 		agpMode;
     drmSize		agpSize;
     FBLinearPtr		reserved;

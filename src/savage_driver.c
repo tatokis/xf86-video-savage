@@ -207,9 +207,11 @@ typedef enum {
     ,OPTION_DISABLE_TILE
     ,OPTION_DISABLE_COB
     ,OPTION_BCI_FOR_XV
+    ,OPTION_DVI
+    ,OPTION_FORCE_PCI
+    ,OPTION_DMA_TYPE
     ,OPTION_AGP_MODE
     ,OPTION_AGP_SIZE
-    ,OPTION_DVI
 } SavageOpts;
 
 
@@ -234,9 +236,13 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_DISABLE_TILE, "DisableTile", OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_DISABLE_COB,  "DisableCOB",  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_BCI_FOR_XV,   "BCIforXv",    OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_AGP_MODE,     "AGPMode",   OPTV_INTEGER, {0}, FALSE },
-    { OPTION_AGP_SIZE,     "AGPSize",   OPTV_INTEGER, {0}, FALSE },
     { OPTION_DVI,          "DVI",       OPTV_BOOLEAN, {0}, FALSE },
+#ifdef XF86DRI
+    { OPTION_FORCE_PCI,	"ForcePCIMode",	OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_DMA_TYPE,	"DmaType",	OPTV_ANYSTR,  {0}, FALSE },
+    { OPTION_AGP_MODE,	"AGPMode",	OPTV_INTEGER, {0}, FALSE },
+    { OPTION_AGP_SIZE,	"AGPSize",	OPTV_INTEGER, {0}, FALSE },
+#endif
     { -1,		NULL,		OPTV_NONE,    {0}, FALSE }
 };
 
@@ -1359,6 +1365,11 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "%s card detected\n",
 	       (psav->IsPCI) ? "PCI" : "AGP");
 
+    if (xf86ReturnOptValBool(psav->Options, OPTION_FORCE_PCI, FALSE)) {
+	psav->IsPCI = TRUE;
+	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Forced into PCI-only mode\n");
+    }
+
     if (!psav->IsPCI) {
 	from = X_DEFAULT;
 	psav->agpMode = SAVAGE_DEFAULT_AGP_MODE;
@@ -1406,6 +1417,30 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     } else {
 	psav->agpMode = 0;
 	psav->agpSize = 0;
+    }
+
+    psav->AgpDMA = !psav->IsPCI;
+    if ((s = xf86GetOptValString(psav->Options, OPTION_DMA_TYPE))) {
+	if (strcmp(s, "AGP") == 0) {
+	    if (psav->IsPCI) {
+		psav->AgpDMA = FALSE;
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "AGP DMA not available on PCI card, using PCI DMA\n");
+	    } else {
+		psav->AgpDMA = TRUE;
+		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using AGP DMA\n");
+	    }
+	} else if (strcmp(s, "PCI") == 0) {
+	    psav->AgpDMA = FALSE;
+	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using PCI DMA\n");
+	} else {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Invalid DmaType option, using %s DMA\n",
+		       psav->AgpDMA ? "AGP" : "PCI");
+	}
+    } else {
+	xf86DrvMsg(pScrn->scrnIndex, X_DEFAULT,
+		   "Using %s DMA\n", psav->AgpDMA ? "AGP" : "PCI");
     }
 
 #endif
