@@ -101,6 +101,12 @@ necessary to override it here.  The
 parameter may be specified as an integer in Hz (135750000), or with
 standard suffixes like "k", "kHz", "M", or "MHz" (as in 135.75MHz).
 .TP
+.BI "Option \*qCrtOnly\*q \*q" boolean \*q  
+This option disables output to the LCD and enables output to the CRT port only.  
+It is useful on laptops if you only want to use the CRT port or to force the CRT 
+output only on desktop cards that use mobile chips. Default: auto-detect active 
+outputs
+.TP
 .BI "Option \*qUseBIOS\*q \*q" boolean \*q
 Enable or disable use of the video BIOS to change modes.  Ordinarily, the 
 .B savage 
@@ -158,23 +164,28 @@ The amount of AGP memory that will allocated for DMA and textures in
 MB. Valid sizes are 4, 8, 16, 32, 64, 128 and 256. The default is
 16MB.
 .TP
-.BI "Option \*qCrtOnly\*q \*q" boolean \*q  
-This option disables output to the LCD and enables output to the CRT port only.  
-It is useful on laptops if you only want to use the CRT port or to force the CRT 
-output only on desktop cards that use mobile chips. Default: auto-detect active 
-outputs
-.TP
-.BI "Option \*qDmaType\*q \*q" AGP \*q
-.TP
-.BI "Option \*qDmaType\*q \*q" PCI \*q
+.BI "Option \*qDmaType\*q \*q" string \*q
 The type of memory that will be used by the 3D driver for DMA (direct
-memory access). \*qPCI\*q works with all hardware but with poor
-performance. \*qAGP\*q only works if you have an AGP card. The default
-is \*qAGP\*q if you have an AGP card, \*qPCI\*q otherwise.
+memory access).
+.br
+PCI    \-\- PCI memory (default on PCI cards)
+.br
+AGP    \-\- AGP memory (default on AGP cards)
+.br
+\*qAGP\*q only works if you have an AGP card.
 .TP
-.BI "Option \*qForcePCIMode\*q \*q" boolean \*q
-If you turn this on then PCI memory will be used for DMA and AGP
-textures will be disabled.
+.BI "Option \*qBusType\*q \*q" string \*q
+The bus type that will be used to access the graphics card.
+.br
+PCI    \-\- PCI bus (default on PCI cards)
+.br
+AGP    \-\- AGP bus (default on AGP cards)
+.br
+\*qAGP\*q only works if you have an AGP card. If you choose \*qPCI\*q
+on an AGP card the AGP bus speed is not set and no AGP aperture is
+allocated. This implies
+.BI DmaType
+\*qPCI\*q.
 .SH FILES
 savage_drv.o
 .SH "SEE ALSO"

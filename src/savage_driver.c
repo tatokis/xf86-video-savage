@@ -208,7 +208,7 @@ typedef enum {
     ,OPTION_DISABLE_COB
     ,OPTION_BCI_FOR_XV
     ,OPTION_DVI
-    ,OPTION_FORCE_PCI
+    ,OPTION_BUS_TYPE
     ,OPTION_DMA_TYPE
     ,OPTION_AGP_MODE
     ,OPTION_AGP_SIZE
@@ -238,7 +238,7 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_BCI_FOR_XV,   "BCIforXv",    OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_DVI,          "DVI",       OPTV_BOOLEAN, {0}, FALSE },
 #ifdef XF86DRI
-    { OPTION_FORCE_PCI,	"ForcePCIMode",	OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_BUS_TYPE,	"BusType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_DMA_TYPE,	"DmaType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_AGP_MODE,	"AGPMode",	OPTV_INTEGER, {0}, FALSE },
     { OPTION_AGP_SIZE,	"AGPSize",	OPTV_INTEGER, {0}, FALSE },
@@ -1306,6 +1306,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     } else
 	psav->ChipRev = psav->PciInfo->chipRev;
 
+    xf86DrvMsg(pScrn->scrnIndex, from, "Engine: \"%s\"\n", pScrn->chipset);
+
     if (pEnt->device->videoRam != 0)
     	pScrn->videoRam = pEnt->device->videoRam;
 
@@ -1377,12 +1379,47 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	}
     }
 
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "%s card detected\n",
+    xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "%s card detected\n",
 	       (psav->IsPCI) ? "PCI" : "AGP");
 
-    if (xf86ReturnOptValBool(psav->Options, OPTION_FORCE_PCI, FALSE)) {
-	psav->IsPCI = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Forced into PCI-only mode\n");
+    if ((s = xf86GetOptValString(psav->Options, OPTION_BUS_TYPE))) {
+	if (strcmp(s, "AGP") == 0) {
+	    if (psav->IsPCI) {
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "BusType AGP not available on PCI card\n");
+	    } else {
+		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "BusType set to AGP\n");
+	    }
+	} else if (strcmp(s, "PCI") == 0) {
+	    psav->IsPCI = TRUE;
+	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "BusType set to PCI\n");
+	} else {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Invalid BusType option, using %s DMA\n",
+		       psav->IsPCI ? "PCI" : "AGP");
+	}
+    }
+
+    psav->AgpDMA = !psav->IsPCI;
+    if ((s = xf86GetOptValString(psav->Options, OPTION_DMA_TYPE))) {
+	if (strcmp(s, "AGP") == 0) {
+	    if (psav->IsPCI) {
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "AGP DMA not available on PCI card, using PCI DMA\n");
+	    } else {
+		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using AGP DMA\n");
+	    }
+	} else if (strcmp(s, "PCI") == 0) {
+	    psav->AgpDMA = FALSE;
+	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using PCI DMA\n");
+	} else {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Invalid DmaType option, using %s DMA\n",
+		       psav->AgpDMA ? "AGP" : "PCI");
+	}
+    } else {
+	xf86DrvMsg(pScrn->scrnIndex, X_DEFAULT,
+		   "Using %s DMA\n", psav->AgpDMA ? "AGP" : "PCI");
     }
 
     if (!psav->IsPCI) {
@@ -1409,6 +1446,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, from, "Using AGP %dx mode\n",
 		   psav->agpMode);
 
+	from = X_DEFAULT;
 	if (xf86GetOptValInteger(psav->Options,
 				 OPTION_AGP_SIZE, (int *)&(psav->agpSize))) {
 	    switch (psav->agpSize) {
@@ -1419,6 +1457,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	    case 64:
 	    case 128:
 	    case 256:
+		from = X_CONFIG;
 		break;
 	    default:
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
@@ -1427,35 +1466,11 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	    }
 	}
 
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+	xf86DrvMsg(pScrn->scrnIndex, from,
 		   "Using %d MB AGP aperture\n", psav->agpSize);
     } else {
 	psav->agpMode = 0;
 	psav->agpSize = 0;
-    }
-
-    psav->AgpDMA = !psav->IsPCI;
-    if ((s = xf86GetOptValString(psav->Options, OPTION_DMA_TYPE))) {
-	if (strcmp(s, "AGP") == 0) {
-	    if (psav->IsPCI) {
-		psav->AgpDMA = FALSE;
-		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-			   "AGP DMA not available on PCI card, using PCI DMA\n");
-	    } else {
-		psav->AgpDMA = TRUE;
-		xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using AGP DMA\n");
-	    }
-	} else if (strcmp(s, "PCI") == 0) {
-	    psav->AgpDMA = FALSE;
-	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Using PCI DMA\n");
-	} else {
-	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-		       "Invalid DmaType option, using %s DMA\n",
-		       psav->AgpDMA ? "AGP" : "PCI");
-	}
-    } else {
-	xf86DrvMsg(pScrn->scrnIndex, X_DEFAULT,
-		   "Using %s DMA\n", psav->AgpDMA ? "AGP" : "PCI");
     }
 
 #endif
@@ -1537,8 +1552,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "BIOS currently required for Dualhead mode setting.\n");
 
     /* maybe throw in some more sanity checks here */
-
-    xf86DrvMsg(pScrn->scrnIndex, from, "Engine: \"%s\"\n", pScrn->chipset);
 
     if (!SavageMapMMIO(pScrn)) {
 	SavageFreeRec(pScrn);
@@ -1785,7 +1798,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     	sr30 = VGAIN8(0x3c5);
     	if (sr30 & 0x02 /*0x04 */) {
             dvi = TRUE;
-	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Digital Flat Panel Detected\n");
+	    xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "Digital Flat Panel Detected\n");
 	}
     }
 
@@ -2732,7 +2745,7 @@ static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
 	psav->FrameBufferBase = psav->PciInfo->memBase[1];
     }
 
-    xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
+    xf86DrvMsg( pScrn->scrnIndex, X_INFO,
 	"mapping MMIO @ 0x%lx with size 0x%x\n",
 	psav->MmioBase, SAVAGE_NEWMMIO_REGSIZE);
 
