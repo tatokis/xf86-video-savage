@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.c,v 1.48tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.c,v 1.43 2003/08/23 16:09:20 dawes Exp $ */
 /*
  * vim: sw=4 ts=8 ai ic:
  *
@@ -288,6 +288,7 @@ static const char *xaaSymbols[] = {
     "XAAHelpPatternROP",
     "XAAHelpSolidROP",
     "XAAInit",
+    "XAAScreenIndex",
     NULL
 };
 
@@ -323,7 +324,7 @@ static XF86ModuleVersionInfo SavageVersRec = {
     MODULEVENDORSTRING,
     MODINFOSTRING1,
     MODINFOSTRING2,
-    XORG_VERSION_CURRENT,
+    XF86_VERSION_CURRENT,
     VERSION_MAJOR, VERSION_MINOR, PATCHLEVEL,
     ABI_CLASS_VIDEODRV,
     ABI_VIDEODRV_VERSION,
@@ -373,8 +374,7 @@ ResetBCI2K( SavagePtr psav )
 	! (ALT_STATUS_WORD0 & 0x00200000)
     )
     {
-	ErrorF( "Resetting BCI, stat = %08lx...\n",
-		(unsigned long) ALT_STATUS_WORD0);
+	ErrorF( "Resetting BCI, stat = %08x...\n", ALT_STATUS_WORD0);
 	/* Turn off BCI */
 	OUTREG( 0x48c18, cob & ~8 );
 	usleep(10000);
@@ -647,7 +647,7 @@ static Bool SavageProbe(DriverPtr drv, int flags)
 	for (i=0; i<numUsed; i++) {
 	    ScrnInfoPtr pScrn = xf86AllocateScreen(drv, 0);
 
-	    pScrn->driverVersion = SAVAGE_VERSION;
+	    pScrn->driverVersion = (int)DRIVER_VERSION;
 	    pScrn->driverName = DRIVER_NAME;
 	    pScrn->name = "SAVAGE";
 	    pScrn->Probe = SavageProbe;
@@ -1481,13 +1481,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
     gpScrn = pScrn;
     SavageEnableMMIO(pScrn);
     SavageSave(pScrn);
-    if(SavageModeInit(pScrn, pScrn->currentMode)) {
-	/* some BIOSes seem to enable HW cursor on PM resume */
-	if (!SAVPTR(pScrn)->hwc_on)
-	    SavageHideCursor( pScrn ); 
-	return TRUE;
-    }
-    return FALSE;
+    return SavageModeInit(pScrn, pScrn->currentMode);
 }
 
 
@@ -1690,7 +1684,7 @@ static void SavageSave(ScrnInfoPtr pScrn)
 static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 			    SavageRegPtr restore, Bool Entering)
 {
-    unsigned char tmp, cr3a, cr66;
+    unsigned char tmp, cr3a, cr66, cr67;
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     SavagePtr psav = SAVPTR(pScrn);
     int vgaCRIndex, vgaCRReg, vgaIOBase;
@@ -1858,16 +1852,6 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 	/* set the correct clock for some BIOSes */
 	VGAOUT8(VGA_MISC_OUT_W, 
 		VGAIN8(VGA_MISC_OUT_R) | 0x0C);
-	/* Some BIOSes turn on clock doubling on non-doubled modes */
-	if (pScrn->bitsPerPixel < 24) {
-	    VGAOUT8(vgaCRIndex, 0x67);
-	    if (!(VGAIN8(vgaCRReg) & 0x10)) {
-		VGAOUT8(0x3c4, 0x15);
-		VGAOUT8(0x3c5, VGAIN8(0x3C5) & ~0x10);
-		VGAOUT8(0x3c4, 0x18);
-		VGAOUT8(0x3c5, VGAIN8(0x3c5) & ~0x80);
-	    }
-	}
 
 	SavageInitialize2DEngine(pScrn);
 	SavageSetGBD(pScrn);
@@ -1906,7 +1890,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
     }
 
     VGAOUT8(vgaCRIndex, 0x67);
-    (void) VGAIN8(vgaCRReg);
+    cr67 = VGAIN8(vgaCRReg);
     VGAOUT8(vgaCRReg, restore->CR67 & ~0x0c); /* no STREAMS yet */
 
     /* restore extended regs */
@@ -2148,7 +2132,7 @@ static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
     }
 
     xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
-	"mapping MMIO @ 0x%lx with size 0x%x\n",
+	"mapping MMIO @ 0x%x with size 0x%x\n",
 	psav->MmioBase, SAVAGE_NEWMMIO_REGSIZE);
 
     psav->MapBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, psav->PciTag,
@@ -2182,7 +2166,7 @@ static Bool SavageMapFB(ScrnInfoPtr pScrn)
     TRACE(("SavageMapFB()\n"));
 
     xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
-	"mapping framebuffer @ 0x%lx with size 0x%x\n", 
+	"mapping framebuffer @ 0x%x with size 0x%x\n", 
 	psav->FrameBufferBase, psav->videoRambytes);
 
     if (psav->videoRambytes) {
@@ -2268,8 +2252,8 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 	    (psav->FBBase + psav->CursorKByte*1024 + 4096 - 32);
 	
 	xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
-		    "Shadow area physical %08lx, linear %p\n",
-		    psav->ShadowPhysical, (void *)psav->ShadowVirtual );
+		    "Shadow area physical %08x, linear %08x\n",
+		    psav->ShadowPhysical, psav->ShadowVirtual );
 
 	psav->WaitQueue = ShadowWait1;
 	psav->WaitIdle = ShadowWait;
@@ -2972,6 +2956,10 @@ void SavageLoadPaletteSavage4(ScrnInfoPtr pScrn, int numColors, int *indicies,
     int i, index;
 
     vgaHWPtr hwp = VGAHWPTR(pScrn);
+    int vgaCRIndex, vgaCRReg, vgaIOBase;
+    vgaIOBase = hwp->IOBase;
+    vgaCRIndex = vgaIOBase + 4;
+    vgaCRReg = vgaIOBase + 5;
     VerticalRetraceWait(psav);
 
     for (i=0; i<numColors; i++) {

@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_video.c,v 1.17tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_video.c,v 1.15 2003/06/18 16:17:40 eich Exp $ */
 
 #include "Xv.h"
 #include "dix.h"
@@ -298,10 +298,10 @@ unsigned int GetBlendForFourCC( int id )
 
 void myOUTREG( SavagePtr psav, unsigned long offset, unsigned long value )
 {
-    ErrorF( "MMIO %04lx, was %08lx, want %08lx,", 
-	offset, (unsigned long)MMIO_IN32( psav->MapBase, offset ), value );
+    ErrorF( "MMIO %04x, was %08x, want %08x,", 
+	offset, MMIO_IN32( psav->MapBase, offset ), value );
     MMIO_OUT32( psav->MapBase, offset, value );
-    ErrorF( " now %08lx\n", (unsigned long)MMIO_IN32( psav->MapBase, offset ) );
+    ErrorF( " now %08x\n", MMIO_IN32( psav->MapBase, offset ) );
 }
 
 void SavageInitStreamsOld(ScrnInfoPtr pScrn)
@@ -451,7 +451,7 @@ void SavageStreamsOn(ScrnInfoPtr pScrn, int id)
 	VGAOUT16( vgaCRIndex, (jStreamsControl << 8) | EXT_MISC_CTRL2 );
 
 	psav->blendBase = GetBlendForFourCC( id ) << 9;
-	xf86ErrorFVerb(XVTRACE+1,"Format %4.4s, blend is %08x\n", (char *)&id, psav->blendBase );
+	xf86ErrorFVerb(XVTRACE+1,"Format %4.4s, blend is %08x\n", &id, psav->blendBase );
 	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
 
 	/* These values specify brightness, contrast, saturation and hue. */
@@ -705,7 +705,7 @@ void SavageSetColorOld( ScrnInfoPtr pScrn )
     SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
 
     xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
-	pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
+	pPriv->brightness, pPriv->contrast, pPriv->saturation, pPriv->hue );
 
     if( 
 	(psav->videoFourCC == FOURCC_RV15) ||
@@ -747,7 +747,7 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     unsigned long assembly;
 
     xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
-	pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
+	pPriv->brightness, pPriv->contrast, pPriv->saturation, pPriv->hue );
 
     if( psav->videoFourCC == FOURCC_Y211 )
 	k = 1.0;	/* YUV */
@@ -775,20 +775,20 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     k2 = (int)(dk2+0.5) & 0x1ff;
     k3 = (int)(dk3+0.5) & 0x1ff;
     assembly = (k3<<18) | (k2<<9) | k1;
-    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08lx  ", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08x  ", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT1, assembly );
 
     k4 = (int)(dk4+0.5) & 0x1ff;
     k5 = (int)(dk5+0.5) & 0x1ff;
     k6 = (int)(dk6+0.5) & 0x1ff;
     assembly = (k6<<18) | (k5<<9) | k4;
-    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08lx  ", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08x  ", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT2, assembly );
 
     k7 = (int)(dk7+0.5) & 0x1ff;
     kb = (int)(dkb+0.5) & 0xffff;
     assembly = (kb<<9) | k7;
-    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08lx\n", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08x\n", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly );
 }
 
@@ -869,7 +869,7 @@ SavageSetupImageVideo(ScreenPtr pScreen)
     pPriv->lastKnownPitch = 0;
 
     /* gotta uninit this someplace */
-    REGION_NULL(pScreen, &pPriv->clip);
+    REGION_INIT(pScreen, &pPriv->clip, NullBox, 0); 
 
     psav->adaptor = adapt;
 
@@ -1393,7 +1393,6 @@ SavagePutImage(
 ){
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
     SavagePtr psav = SAVPTR(pScrn);
-    ScreenPtr pScreen = pScrn->pScreen;
     INT32 x1, x2, y1, y2;
     unsigned char *dst_start;
     int pitch, new_h, offset, offsetV=0, offsetU=0;
@@ -1518,8 +1517,8 @@ SavagePutImage(
 	     x1, y1, x2, y2, &dstBox, src_w, src_h, drw_w, drw_h);
 
     /* update cliplist */
-    if(!REGION_EQUAL(pScreen, &pPriv->clip, clipBoxes)) {
-	REGION_COPY(pScreen, &pPriv->clip, clipBoxes);
+    if(!REGION_EQUAL(pScrn->pScreen, &pPriv->clip, clipBoxes)) {
+	REGION_COPY(pScrn->pScreen, &pPriv->clip, clipBoxes);
 	/* draw these */
 	xf86XVFillKeyHelper(pScrn->pScreen, pPriv->colorKey, clipBoxes);
     }
@@ -1744,7 +1743,6 @@ SavageDisplaySurface(
 ){
     OffscreenPrivPtr pPriv = (OffscreenPrivPtr)surface->devPrivate.ptr;
     ScrnInfoPtr pScrn = surface->pScrn;
-    ScreenPtr pScreen = pScrn->pScreen;
     SavagePortPrivPtr portPriv = GET_PORT_PRIVATE(pScrn);
     INT32 x1, y1, x2, y2;
     BoxRec dstBox;
@@ -1781,7 +1779,7 @@ SavageDisplaySurface(
     pPriv->isOn = TRUE;
 #if 0
     if(portPriv->videoStatus & CLIENT_VIDEO_ON) {
-	REGION_EMPTY(pScreen, &portPriv->clip);
+	REGION_EMPTY(pScrn->pScreen, &portPriv->clip);   
 	UpdateCurrentTime();
 	portPriv->videoStatus = FREE_TIMER;
 	portPriv->freeTime = currentTime.milliseconds + FREE_DELAY;
