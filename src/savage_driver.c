@@ -1912,6 +1912,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
 	    SavageHideCursor( pScrn ); 
 	return TRUE;
     }
+
     return FALSE;
 }
 
@@ -1937,7 +1938,8 @@ static void SavageLeaveVT(int scrnIndex, int flags)
         psav->LockHeld = 1;
     }
 #endif
-    SavageStreamsOff(pScrn);
+    if (psav->FBStart2nd)
+        SavageStreamsOff(pScrn);
     SavageWriteMode(pScrn, vgaSavePtr, SavageSavePtr, FALSE);
     SavageResetStreams(pScrn);
     SavageDisableMMIO(pScrn);
@@ -3058,6 +3060,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     }
 #endif
 
+    SavagePanningCheck(pScrn);
 #ifdef XvExtension
     if( !psav->FBStart2nd && !psav->NoAccel  /*&& !SavagePanningCheck(pScrn)*/ ) {
 	if (psav->IsSecondary)
@@ -3255,10 +3258,11 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
         /* do it! */
         SavageWriteMode(pScrn, vganew, new, TRUE);
-        SavageStreamsOn(pScrn);
 
-        if (psav->FBStart2nd)
+        if (psav->FBStart2nd) {
+	    SavageStreamsOn(pScrn);
 	    SavageInitSecondaryStream(pScrn);
+        }
 
         SavageAdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 	return TRUE;
@@ -3515,10 +3519,11 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     /* do it! */
     SavageWriteMode(pScrn, vganew, new, TRUE);
-    SavageStreamsOn(pScrn);
 
-    if (psav->FBStart2nd)
+    if (psav->FBStart2nd) {
+        SavageStreamsOn(pScrn);
 	SavageInitSecondaryStream(pScrn);
+    }
 
     SavageAdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
@@ -3555,7 +3560,8 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
     }
 
     if (pScrn->vtSema) {
-	SavageStreamsOff(pScrn);
+        if (psav->FBStart2nd) 
+	    SavageStreamsOff(pScrn);
 	SavageWriteMode(pScrn, vgaSavePtr, SavageSavePtr, FALSE);
         SavageResetStreams(pScrn);
 	vgaHWLock(hwp);
@@ -3677,7 +3683,8 @@ Bool SavageSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
 
     TRACE(("SavageSwitchMode\n"));
 
-    SavageStreamsOff(xf86Screens[scrnIndex]);
+    if (psav->FBStart2nd)
+        SavageStreamsOff(xf86Screens[scrnIndex]);
 
     success = SavageModeInit(xf86Screens[scrnIndex], mode);
 
@@ -3690,6 +3697,7 @@ Bool SavageSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
         pSavEnt = pPriv->ptr;
         SavageModeInit(pSavEnt->pSecondaryScrn, pSavEnt->pSecondaryScrn->currentMode);
     }
+    SavagePanningCheck(pScrn);
 
     return success;
 }

@@ -485,6 +485,10 @@ void SavageInitVideo( ScreenPtr pScreen );
 void SavageStreamsOn(ScrnInfoPtr pScrn);
 void SavageStreamsOff(ScrnInfoPtr pScrn);
 void SavageInitSecondaryStream(ScrnInfoPtr pScrn);
+void SavageInitStreamsOld(ScrnInfoPtr pScrn);
+void SavageInitStreamsNew(ScrnInfoPtr pScrn);
+void SavageInitStreams2000(ScrnInfoPtr pScrn);
+
 
 #if (MODE_24 == 32)
 # define  BYTES_PP24 4

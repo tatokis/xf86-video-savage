@@ -9,6 +9,7 @@
 
 static void SavageInitStreamsOld(ScrnInfoPtr pScrn);
 static void SavageInitStreamsNew(ScrnInfoPtr pScrn);
+static void SavageInitStreams2000(ScrnInfoPtr pScrn);
 
 static void OverlayTwisterInit(ScrnInfoPtr pScrn);
 static void OverlayParamInit(ScrnInfoPtr pScrn);
@@ -597,6 +598,8 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 
     /* SR70 |= 0x10 */
 
+    psav->videoFlags |= VF_STREAMS_ON;
+
 }
 
 void
@@ -647,6 +650,8 @@ SavageStreamsOff(ScrnInfoPtr pScrn)
     VGAOUT16( vgaCRIndex, 0x0093 );
     VGAOUT8( vgaCRIndex, 0x92 );
     VGAOUT8( vgaCRReg, VGAIN8(vgaCRReg) & 0x40 );
+
+    psav->videoFlags &= ~VF_STREAMS_ON;
 
 }
 

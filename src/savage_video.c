@@ -46,6 +46,8 @@ static void SavageSetColorNew(ScrnInfoPtr pScrn );
 static void SavageSetColor2000(ScrnInfoPtr pScrn );
 static void (*SavageSetColor)(ScrnInfoPtr pScrn ) = NULL;
 
+static void (*SavageInitStreams)(ScrnInfoPtr pScrn) = NULL;
+
 static void SavageDisplayVideoOld(
     ScrnInfoPtr pScrn, int id, int offset,
     short width, short height, int pitch, 
@@ -239,6 +241,7 @@ void savageOUTREG( SavagePtr psav, unsigned long offset, unsigned long value )
     ErrorF( " now %08lx\n", (CARD32)MMIO_IN32( psav->MapBase, offset ) );
 }
 
+#if 0
 static void
 SavageClipVWindow(ScrnInfoPtr pScrn)
 {
@@ -263,6 +266,7 @@ SavageClipVWindow(ScrnInfoPtr pScrn)
 	OUTREG( SSTREAM_WINDOW_START_REG, 0x03ff03ff);
     }
 }
+#endif
 
 void SavageInitVideo(ScreenPtr pScreen)
 {
@@ -278,6 +282,7 @@ void SavageInitVideo(ScreenPtr pScreen)
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
 
+	SavageInitStreams = SavageInitStreamsNew;
 	SavageSetColor = SavageSetColorNew;
 	SavageSetColorKey = SavageSetColorKeyNew;
 	SavageDisplayVideo = SavageDisplayVideoNew;
@@ -287,6 +292,7 @@ void SavageInitVideo(ScreenPtr pScreen)
         newAdaptor = SavageSetupImageVideo(pScreen);
         SavageInitOffscreenImages(pScreen);
 
+	SavageInitStreams = SavageInitStreams2000;
         SavageSetColor = SavageSetColor2000;
         SavageSetColorKey = SavageSetColorKey2000;
         SavageDisplayVideo = SavageDisplayVideo2000;
@@ -296,6 +302,7 @@ void SavageInitVideo(ScreenPtr pScreen)
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
 
+	SavageInitStreams = SavageInitStreamsOld;
 	SavageSetColor = SavageSetColorOld;
 	SavageSetColorKey = SavageSetColorKeyOld;
 	SavageDisplayVideo = SavageDisplayVideoOld;
@@ -924,8 +931,8 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
     REGION_EMPTY(pScrn->pScreen, &pPriv->clip);   
 
     if(shutdown) {
-	SavageClipVWindow(pScrn);
-/* 	SavageStreamsOff( pScrn ); */
+      /*SavageClipVWindow(pScrn);*/
+ 	SavageStreamsOff( pScrn );
 	if(pPriv->area) {
 	    xf86FreeOffscreenArea(pPriv->area);
 	    pPriv->area = NULL;
@@ -1277,11 +1284,21 @@ SavageDisplayVideoOld(
     vgaIOBase = hwp->IOBase;
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
-
+#if 0
     if ( psav->videoFourCC != id ) {
 	SavageSetBlend(pScrn,id);
 	SavageResetVideo(pScrn);
     }
+#endif
+    if( psav->videoFourCC != id )
+      SavageStreamsOff(pScrn);
+
+    if( !psav->videoFlags & VF_STREAMS_ON )
+      {
+        SavageSetBlend(pScrn,id);
+	SavageStreamsOn(pScrn);
+	SavageResetVideo(pScrn);
+      }
 
     if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
         && psav->FPExpansion) {
@@ -1402,11 +1419,21 @@ SavageDisplayVideoNew(
     vgaIOBase = hwp->IOBase;
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
-
+#if 0
     if ( psav->videoFourCC != id ) {
 	SavageSetBlend(pScrn,id);
 	SavageResetVideo(pScrn);
     }
+#endif
+    if( psav->videoFourCC != id )
+      SavageStreamsOff(pScrn);
+
+    if( !psav->videoFlags & VF_STREAMS_ON )
+      {
+	SavageSetBlend(pScrn,id);
+	SavageStreamsOn(pScrn);
+	SavageResetVideo(pScrn);
+      }
 
     /* Calculate horizontal and vertical scale factors. */
 
@@ -1849,7 +1876,8 @@ SavageStopSurface(
 
     if(pPriv->isOn) {
 	/*SavagePtr psav = SAVPTR(surface->pScrn);*/
-	SavageClipVWindow(surface->pScrn);
+	/*SavageClipVWindow(surface->pScrn);*/
+	SavageStreamsOff( surface->pScrn );
 	pPriv->isOn = FALSE;
     }
 
