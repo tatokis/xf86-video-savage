@@ -219,7 +219,6 @@ static int GetTileAperturePitch(ulong dwWidth, ulong dwBpp);
 void SavageSetGBD_M7(ScrnInfoPtr pScrn);            
 void SavageSetGBD_Twister(ScrnInfoPtr pScrn);
 void SavageSetGBD_PM(ScrnInfoPtr pScrn);
-void SavageSetGBD_2000(ScrnInfoPtr pScrn);
 
 /*
  * This is used to cache the last known value for routines we want to
@@ -461,13 +460,11 @@ SavageSetGBD(ScrnInfoPtr pScrn)
         case S3_TWISTER:
         case S3_PROSAVAGE:            
         case S3_PROSAVAGEDDR:
+        case S3_SAVAGE2000:
             SavageSetGBD_Twister(pScrn);
             break;
         case S3_SUPERSAVAGE:
             SavageSetGBD_PM(pScrn);
-            break;
-        case S3_SAVAGE2000:
-	    SavageSetGBD_2000(pScrn);
             break;
     }
 }
@@ -986,8 +983,7 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     /* program the GBD and SBDs */
     OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
     OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart 
-			     | bci_enable /* AGD: shouldn't BCI be enabled? */
-                             | S3_LITTLE_ENDIAN | 0x10000000 | S3_BD64));
+			     | bci_enable | S3_LITTLE_ENDIAN | 0x10000000 | S3_BD64));
     OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
     OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
     OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
@@ -997,48 +993,6 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     OUTREG8(SEQ_ADDRESS_REG,0x01);
     byte = INREG8(SEQ_DATA_REG) & ~0x20;
     OUTREG8(SEQ_DATA_REG,byte);
-}
-
-void SavageSetGBD_2000(ScrnInfoPtr pScrn)
-{
-    vgaHWPtr hwp = VGAHWPTR(pScrn);
-    SavagePtr psav = SAVPTR(pScrn);
-    unsigned int vgaCRIndex = hwp->IOBase + 4;
-    unsigned int vgaCRReg = hwp->IOBase + 5;
-    unsigned long GlobalBitmapDescriptor;
-
-
-/* AGD: no idea how to program savage2000 GBD... for now default to Tim's method */
-
-    GlobalBitmapDescriptor = 1 | 8 | BCI_BD_BW_DISABLE;
-    BCI_BD_SET_BPP(GlobalBitmapDescriptor, pScrn->bitsPerPixel);
-    BCI_BD_SET_STRIDE(GlobalBitmapDescriptor, pScrn->displayWidth);
-
-    /* Turn on 16-bit register access. */
-
-    VGAOUT8(vgaCRIndex, 0x31);
-    VGAOUT8(vgaCRReg, 0x0c);
-
-    /* Set stride to use GBD. */
-
-    VGAOUT8(vgaCRIndex, 0x50);
-    VGAOUT8(vgaCRReg, VGAIN8(vgaCRReg) | 0xC1);
-
-    /* Enable 2D engine. */
-
-    VGAOUT16(vgaCRIndex, 0x0140);
-
-    /* Now set the GBD and SBDs. */
-
-    OUTREG(0x8168, 0);
-    OUTREG(0x816C, GlobalBitmapDescriptor);
-    OUTREG(0x8170, 0);
-    OUTREG(0x8174, GlobalBitmapDescriptor);
-    OUTREG(0x8178, 0);
-    OUTREG(0x817C, GlobalBitmapDescriptor);
-
-    OUTREG(PRI_STREAM_STRIDE, pScrn->displayWidth * pScrn->bitsPerPixel >> 3);
-    OUTREG(SEC_STREAM_STRIDE, pScrn->displayWidth * pScrn->bitsPerPixel >> 3);    
 }
 
 /* Acceleration init function, sets up pointers to our accelerated functions */
