@@ -3,6 +3,14 @@
 #ifndef _SAVAGE_REGS_H
 #define _SAVAGE_REGS_H
 
+/* Copied and renamed from radeon_reg.h for AGP/PCI detection. */
+#define SAVAGE_STATUS_PCI_CONFIG            0x06
+#       define SAVAGE_CAP_LIST              0x100000
+#define SAVAGE_CAPABILITIES_PTR_PCI_CONFIG  0x34 /* offset in PCI config*/
+#       define SAVAGE_CAP_PTR_MASK          0xfc /* mask off reserved bits of CAP_PTR */
+#       define SAVAGE_CAP_ID_NULL           0x00 /* End of capability list */
+#       define SAVAGE_CAP_ID_AGP            0x02 /* AGP capability ID */
+
 /* These are here until xf86PciInfo.h is updated. */
 
 #ifndef PCI_CHIP_S3TWISTER_P

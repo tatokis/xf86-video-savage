@@ -733,7 +733,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
    unsigned long mode;
    unsigned int vendor, device;
-   int ret, count;
+   int ret;
    /*int size,numbuffer,i;
    savageAgpBufferPtr agpbuffer;*/
 
@@ -829,18 +829,6 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
 	       "[agp] DMA buffers mapped at 0x%08lx\n",
 	       (unsigned long)pSAVAGEDRIServer->buffers.map );
    */
-   count = drmAddBufs( psav->drmFD,
-		       SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE,
-		       DRM_AGP_BUFFER, pSAVAGEDRIServer->buffers.offset );
-   if ( count <= 0 ) {
-      xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-		  "[drm] failure adding %d %d byte DMA buffers (%d)\n",
-		  SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE, count );
-      return FALSE;
-   }
-   xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[drm] Added %d %d byte DMA buffers\n",
-	       count, SAVAGE_BUFFER_SIZE );
 
    /* AGP textures
     */
@@ -976,6 +964,47 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    return TRUE;
 }
 
+static Bool SAVAGEDRIBuffersInit( ScreenPtr pScreen )
+{
+   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+   SavagePtr psav = SAVPTR(pScrn);
+   SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
+   int count;
+
+   if ( psav->IsPCI ) {
+       count = drmAddBufs( psav->drmFD,
+			   SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE,
+			   0, 0 );
+   } else {
+       count = drmAddBufs( psav->drmFD,
+			   SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE,
+			   DRM_AGP_BUFFER, pSAVAGEDRIServer->buffers.offset );
+   }
+   if ( count <= 0 ) {
+       xf86DrvMsg( pScrn->scrnIndex, X_INFO,
+		   "[drm] failure adding %d %d byte DMA buffers (%d)\n",
+		   SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE, count );
+       return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[drm] Added %d %d byte DMA buffers\n",
+	       count, SAVAGE_BUFFER_SIZE );
+
+   /* not needed in the server
+   pSAVAGEDRIServer->drmBuffers = drmMapBufs( psav->drmFD );
+   if ( !pSAVAGEDRIServer->drmBuffers ) {
+	xf86DrvMsg( pScreen->myNum, X_ERROR,
+		    "[drm] Failed to map DMA buffers list\n" );
+	return FALSE;
+    }
+    xf86DrvMsg( pScreen->myNum, X_INFO,
+		"[drm] Mapped %d DMA buffers\n",
+		pSAVAGEDRIServer->drmBuffers->count );
+   */
+
+    return TRUE;
+}
+
 static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
 {
    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
@@ -992,7 +1021,7 @@ static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
    init.cob_size = psav->cobSize/4; /* size in 32-bit entries */
    init.bci_threshold_lo = psav->bciThresholdLo;
    init.bci_threshold_hi = psav->bciThresholdHi;
-   init.dma_type = SAVAGE_DMA_AGP; /* PCI support will be added soon */
+   init.dma_type = psav->IsPCI ? SAVAGE_DMA_PCI : SAVAGE_DMA_AGP;
 
    init.fb_bpp		= pScrn->bitsPerPixel;
    init.front_offset	= pSAVAGEDRIServer->frontOffset;
@@ -1020,28 +1049,6 @@ static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
 
    return TRUE;
 }
-
-#if 0
-static Bool SAVAGEDRIBuffersInit( ScreenPtr pScreen )
-{
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-
-
-   pSAVAGEDRIServer->drmBuffers = drmMapBufs( psav->drmFD );
-   if ( !pSAVAGEDRIServer->drmBuffers ) {
-	xf86DrvMsg( pScreen->myNum, X_ERROR,
-		    "[drm] Failed to map DMA buffers list\n" );
-	return FALSE;
-    }
-    xf86DrvMsg( pScreen->myNum, X_INFO,
-		"[drm] Mapped %d DMA buffers\n",
-		pSAVAGEDRIServer->drmBuffers->count );
-
-    return TRUE;
-}
-#endif
 
 Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
 {
@@ -1271,18 +1278,30 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    }
 #endif
 
-   if ( !SAVAGEDRIAgpInit( pScreen ) ) {
-      DRICloseScreen( pScreen );
-      return FALSE;
+   if ( !psav->IsPCI && !SAVAGEDRIAgpInit( pScreen ) ) {
+       /*
+       SAVAGEDRICloseScreen( pScreen );
+       return FALSE;
+       */
+       psav->IsPCI = TRUE;
+       xf86DrvMsg( pScrn->scrnIndex, X_WARNING,
+		   "[agp] AGP failed to initialize -- falling back to PCI mode.\n");
+       xf86DrvMsg( pScrn->scrnIndex, X_WARNING,
+		   "[agp] Make sure you have the agpgart kernel module loaded.\n");
    }
 
    if ( !SAVAGEDRIMapInit( pScreen ) ) {
-      DRICloseScreen( pScreen );
+      SAVAGEDRICloseScreen( pScreen );
+      return FALSE;
+   }
+
+   if ( !SAVAGEDRIBuffersInit( pScreen ) ) {
+      SAVAGEDRICloseScreen( pScreen );
       return FALSE;
    }
 
    if ( !SAVAGEInitVisualConfigs( pScreen ) ) {
-      DRICloseScreen( pScreen );
+      SAVAGEDRICloseScreen( pScreen );
       return FALSE;
    }
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[dri] visual configs initialized\n" );
@@ -1319,14 +1338,6 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
       SAVAGEDRICloseScreen( pScreen );
       return FALSE;
    }
-
-/* no dma...... */
-#if 0
-   if ( !SAVAGEDRIBuffersInit( pScreen ) ) {
-      SAVAGEDRICloseScreen( pScreen );
-      return FALSE;
-   }
-#endif
 
    pSAVAGEDRI->chipset          = psav->Chipset;
    pSAVAGEDRI->width		= pScrn->virtualX;
@@ -1533,7 +1544,11 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
       drmUnmap( pSAVAGEDRIServer->registers.map, pSAVAGEDRIServer->registers.size );
       pSAVAGEDRIServer->registers.map = NULL;
    }
-   
+
+   if ( pSAVAGEDRIServer->aperture.map ) {
+      drmUnmap( pSAVAGEDRIServer->aperture.map, pSAVAGEDRIServer->aperture.size );
+      pSAVAGEDRIServer->aperture.map = NULL;
+   }
 
    if ( pSAVAGEDRIServer->agpTextures.map ) {
       drmUnmap( pSAVAGEDRIServer->agpTextures.map, 
@@ -1547,15 +1562,17 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
    if (pSAVAGEDRIServer->registers.handle)
        drmRmMap(psav->drmFD,pSAVAGEDRIServer->registers.handle);
 
+   if (pSAVAGEDRIServer->aperture.handle)
+       drmRmMap(psav->drmFD,pSAVAGEDRIServer->registers.handle);
+
    if (pSAVAGEDRIServer->agpTextures.handle)
        drmRmMap(psav->drmFD,pSAVAGEDRIServer->agpTextures.handle);
 
-/* no DMA now.... */
-#if 0
    if ( pSAVAGEDRIServer->buffers.map ) {
       drmUnmap( pSAVAGEDRIServer->buffers.map, pSAVAGEDRIServer->buffers.size );
       pSAVAGEDRIServer->buffers.map = NULL;
    }
+#if 0
    if ( pSAVAGEDRIServer->primary.map ) {
       drmUnmap( pSAVAGEDRIServer->primary.map, pSAVAGEDRIServer->primary.size );
       pSAVAGEDRIServer->primary.map = NULL;

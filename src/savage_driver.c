@@ -1290,52 +1290,123 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     xfree(pEnt);
 
+    psav->PciTag = pciTag(psav->PciInfo->bus, psav->PciInfo->device,
+			  psav->PciInfo->func);
+
+
     /* Set AGP Mode from config */
     /* We support 1X 2X and 4X  */
 #ifdef XF86DRI
-    from = X_DEFAULT;
-    psav->agpMode = SAVAGE_DEFAULT_AGP_MODE;
-    /*psav->agpMode = SAVAGE_MAX_AGP_MODE;*/
-    psav->agpSize = 16;
-    
-    if (xf86GetOptValInteger(psav->Options,
-                             OPTION_AGP_MODE, &(psav->agpMode))) {
-        if (psav->agpMode < 1) {
-            psav->agpMode = 1;
-        }
-        if (psav->agpMode > SAVAGE_MAX_AGP_MODE) {
-            psav->agpMode = SAVAGE_MAX_AGP_MODE;
-        }
-	if ((psav->agpMode > 2) && 
-	    (psav->Chipset == S3_SAVAGE3D ||
-	     psav->Chipset == S3_SAVAGE_MX))
-		psav->agpMode = 2; /* old savages only support 2x */
-        from = X_CONFIG;
-    }
+				/* AGP/PCI (FK: copied from radeon_driver.c) */
+    /* Proper autodetection of an AGP capable device requires examining
+     * PCI config registers to determine if the device implements extended
+     * PCI capabilities, and then walking the capability list as indicated
+     * in the PCI 2.2 and AGP 2.0 specifications, to determine if AGP
+     * capability is present.  The procedure is outlined as follows:
+     *
+     * 1) Test bit 4 (CAP_LIST) of the PCI status register of the device
+     *    to determine wether or not this device implements any extended
+     *    capabilities.  If this bit is zero, then the device is a PCI 2.1
+     *    or earlier device and is not AGP capable, and we can conclude it
+     *    to be a PCI device.
+     *
+     * 2) If bit 4 of the status register is set, then the device implements
+     *    extended capabilities.  There is an 8 bit wide capabilities pointer
+     *    register located at offset 0x34 in PCI config space which points to
+     *    the first capability in a linked list of extended capabilities that
+     *    this device implements.  The lower two bits of this register are
+     *    reserved and MBZ so must be masked out.
+     *
+     * 3) The extended capabilities list is formed by one or more extended
+     *    capabilities structures which are aligned on DWORD boundaries.
+     *    The first byte of the structure is the capability ID (CAP_ID)
+     *    indicating what extended capability this structure refers to.  The
+     *    second byte of the structure is an offset from the beginning of
+     *    PCI config space pointing to the next capability in the linked
+     *    list (NEXT_PTR) or NULL (0x00) at the end of the list.  The lower
+     *    two bits of this pointer are reserved and MBZ.  By examining the
+     *    CAP_ID of each capability and walking through the list, we will
+     *    either find the AGP_CAP_ID (0x02) indicating this device is an
+     *    AGP device, or we'll reach the end of the list, indicating it is
+     *    a PCI device.
+     *
+     * Mike A. Harris <mharris@redhat.com>
+     *
+     * References:
+     *	- PCI Local Bus Specification Revision 2.2, Chapter 6
+     *	- AGP Interface Specification Revision 2.0, Section 6.1.5
+     */
 
-    xf86DrvMsg(pScrn->scrnIndex, from, "Using AGP %dx mode\n",
-               psav->agpMode);
+    psav->IsPCI = TRUE;
 
-    if (xf86GetOptValInteger(psav->Options,
-				 OPTION_AGP_SIZE, (int *)&(psav->agpSize))) {
-	switch (psav->agpSize) {
-	case 4:
-	case 8:
-	case 16:
-	case 32:
-	case 64:
-	case 128:
-	case 256:
-	    break;
-	default:
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-			   "Illegal AGP size: %d MB, defaulting to 16 MB\n", psav->agpSize);
-	    psav->agpSize = 16;
+    if (pciReadLong(psav->PciTag, PCI_CMD_STAT_REG) & SAVAGE_CAP_LIST) {
+	CARD32 cap_ptr, cap_id;
+
+	cap_ptr = pciReadLong(psav->PciTag,
+			      SAVAGE_CAPABILITIES_PTR_PCI_CONFIG)
+	    & SAVAGE_CAP_PTR_MASK;
+
+	while(cap_ptr != SAVAGE_CAP_ID_NULL) {
+	    cap_id = pciReadLong(psav->PciTag, cap_ptr);
+	    if ((cap_id & 0xff) == SAVAGE_CAP_ID_AGP) {
+		psav->IsPCI = FALSE;
+		break;
+	    }
+	    cap_ptr = (cap_id >> 8) & SAVAGE_CAP_PTR_MASK;
 	}
     }
 
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "%s card detected\n",
+	       (psav->IsPCI) ? "PCI" : "AGP");
+
+    if (!psav->IsPCI) {
+	from = X_DEFAULT;
+	psav->agpMode = SAVAGE_DEFAULT_AGP_MODE;
+	/*psav->agpMode = SAVAGE_MAX_AGP_MODE;*/
+	psav->agpSize = 16;
+    
+	if (xf86GetOptValInteger(psav->Options,
+				 OPTION_AGP_MODE, &(psav->agpMode))) {
+	    if (psav->agpMode < 1) {
+		psav->agpMode = 1;
+	    }
+	    if (psav->agpMode > SAVAGE_MAX_AGP_MODE) {
+		psav->agpMode = SAVAGE_MAX_AGP_MODE;
+	    }
+	    if ((psav->agpMode > 2) && 
+		(psav->Chipset == S3_SAVAGE3D ||
+		 psav->Chipset == S3_SAVAGE_MX))
+		psav->agpMode = 2; /* old savages only support 2x */
+	    from = X_CONFIG;
+	}
+
+	xf86DrvMsg(pScrn->scrnIndex, from, "Using AGP %dx mode\n",
+		   psav->agpMode);
+
+	if (xf86GetOptValInteger(psav->Options,
+				 OPTION_AGP_SIZE, (int *)&(psav->agpSize))) {
+	    switch (psav->agpSize) {
+	    case 4:
+	    case 8:
+	    case 16:
+	    case 32:
+	    case 64:
+	    case 128:
+	    case 256:
+		break;
+	    default:
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+			   "Illegal AGP size: %d MB, defaulting to 16 MB\n", psav->agpSize);
+		psav->agpSize = 16;
+	    }
+	}
+
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		   "Using %d MB AGP aperture\n", psav->agpSize);
+    } else {
+	psav->agpMode = 0;
+	psav->agpSize = 0;
+    }
 
 #endif
 
@@ -1418,10 +1489,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     /* maybe throw in some more sanity checks here */
 
     xf86DrvMsg(pScrn->scrnIndex, from, "Engine: \"%s\"\n", pScrn->chipset);
-
-    psav->PciTag = pciTag(psav->PciInfo->bus, psav->PciInfo->device,
-			  psav->PciInfo->func);
-
 
     if (!SavageMapMMIO(pScrn)) {
 	SavageFreeRec(pScrn);

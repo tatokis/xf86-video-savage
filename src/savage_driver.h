@@ -263,6 +263,7 @@ typedef struct _Savage {
     int			Chipset;
     int			ChipId;
     int			ChipRev;
+    int			IsPCI;
     vbeInfoPtr		pVbe;
     int			EntityIndex;
     int			ShadowCounter;
