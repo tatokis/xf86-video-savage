@@ -15,7 +15,8 @@ savage \- S3 Savage video driver
 .SH DESCRIPTION
 .B savage 
 is an __xservername__ driver for the S3 Savage family video accelerator chips.  2D, 3D, and Xv acceleration
-is supported on all chips except the Savage2000 (2D only).  The
+is supported on all chips except the Savage2000 (2D only).  Dualhead operation is supported on MX, IX, and
+SuperSavage chips.  The
 .B savage
 driver supports PCI and AGP boards with the following chips:
 .TP 16
@@ -29,16 +30,16 @@ driver supports PCI and AGP boards with the following chips:
 (9102) (2D only)
 .TP 16
 .B Savage/MX
-(8c10 and 8c11) (2D, 3D)
+(8c10 and 8c11) (2D, 3D, Dualhead)
 .TP 16
 .B Savage/IX
-(8c12 and 8c13) (2D, 3D)
+(8c12 and 8c13) (2D, 3D, Dualhead)
 .TP 16
 .B SuperSavage/MX
-(8c22, 8c24, and 8c26) (2D, 3D)
+(8c22, 8c24, and 8c26) (2D, 3D, Dualhead)
 .TP 16
 .B SuperSavage/IX
-(8c2a, 8c2b, 8c2c, 8c2d, 8c2e, and 8c2f) (2D, 3D)
+(8c2a, 8c2b, 8c2c, 8c2d, 8c2e, and 8c2f) (2D, 3D, Dualhead)
 .TP 16
 .B ProSavage PM133
 (8a25) (2D, 3D)
@@ -111,7 +112,9 @@ through the BIOS mode list, looking for the mode which most closely matches
 the __xconfigfile__ mode line.  Some purists find this scheme objectionable.  If 
 you would rather have the
 .B savage
-driver use your mode line timing exactly, turn off the UseBios option.  
+driver use your mode line timing exactly, turn off the UseBios option.
+.B Note:
+Use of the BIOS is required for dualhead operation. 
 Default: on (use the BIOS).
 .TP
 .BI "Option \*qShadowStatus\*q \*q" boolean \*q
