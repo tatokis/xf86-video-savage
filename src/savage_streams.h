@@ -192,6 +192,11 @@
 /* Secondary Stream 2 Opaque Overlay Control */
 #define SEC_STREAM2_OPAQUE_OVERLAY      0x8180
 
+/* savage 2000 */
+#define SEC_STREAM_COLOR_CONVERT0_2000       0x8198
+#define SEC_STREAM_COLOR_CONVERT1_2000       0x819c
+#define SEC_STREAM_COLOR_CONVERT2_2000       0x81e0
+#define SEC_STREAM_COLOR_CONVERT3_2000       0x81e4
 
 #define BASE_PAD 0xf
 

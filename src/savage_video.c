@@ -38,10 +38,12 @@ void SavageResetVideo(ScrnInfoPtr pScrn);
 
 static void SavageSetColorKeyOld(ScrnInfoPtr pScrn);
 static void SavageSetColorKeyNew(ScrnInfoPtr pScrn);
+static void SavageSetColorKey2000(ScrnInfoPtr pScrn);
 static void (*SavageSetColorKey)(ScrnInfoPtr pScrn) = NULL;
 
 static void SavageSetColorOld(ScrnInfoPtr pScrn );
 static void SavageSetColorNew(ScrnInfoPtr pScrn );
+static void SavageSetColor2000(ScrnInfoPtr pScrn );
 static void (*SavageSetColor)(ScrnInfoPtr pScrn ) = NULL;
 
 static void SavageDisplayVideoOld(
@@ -53,6 +55,14 @@ static void SavageDisplayVideoOld(
     short drw_w, short drw_h
 );
 static void SavageDisplayVideoNew(
+    ScrnInfoPtr pScrn, int id, int offset,
+    short width, short height, int pitch, 
+    int x1, int y1, int x2, int y2,
+    BoxPtr dstBox,
+    short src_w, short src_h,
+    short drw_w, short drw_h
+);
+static void SavageDisplayVideo2000(
     ScrnInfoPtr pScrn, int id, int offset,
     short width, short height, int pitch, 
     int x1, int y1, int x2, int y2,
@@ -235,8 +245,7 @@ SavageClipVWindow(ScrnInfoPtr pScrn)
     SavagePtr psav = SAVPTR(pScrn);
   
     if( (psav->Chipset == S3_SAVAGE_MX)  ||
-	(psav->Chipset == S3_SUPERSAVAGE) ||
-        (psav->Chipset == S3_SAVAGE2000) ) {
+	(psav->Chipset == S3_SUPERSAVAGE) ) {
 	if (psav->IsSecondary) {
 	    OUTREG(SEC_STREAM2_WINDOW_SZ, 0);
 	} else if (psav->IsPrimary) {
@@ -247,6 +256,8 @@ SavageClipVWindow(ScrnInfoPtr pScrn)
 	    OUTREG(SEC_STREAM2_WINDOW_SZ, 0);
 #endif
   	}
+    } else if (psav->Chipset == S3_SAVAGE2000) {
+        OUTREG(SEC_STREAM_WINDOW_SZ, 0);
     } else {
 	OUTREG( SSTREAM_WINDOW_SIZE_REG, 1);
 	OUTREG( SSTREAM_WINDOW_START_REG, 0x03ff03ff);
@@ -262,8 +273,7 @@ void SavageInitVideo(ScreenPtr pScreen)
     int num_adaptors;
 
     xf86ErrorFVerb(XVTRACE,"SavageInitVideo\n");
-    if (S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-       (psav->Chipset == S3_SAVAGE2000))
+    if (S3_SAVAGE_MOBILE_SERIES(psav->Chipset))
     {
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
@@ -272,12 +282,20 @@ void SavageInitVideo(ScreenPtr pScreen)
 	SavageSetColorKey = SavageSetColorKeyNew;
 	SavageDisplayVideo = SavageDisplayVideoNew;
     }
+    else if (psav->Chipset == S3_SAVAGE2000)
+    {
+        newAdaptor = SavageSetupImageVideo(pScreen);
+        SavageInitOffscreenImages(pScreen);
+
+        SavageSetColor = SavageSetColor2000;
+        SavageSetColorKey = SavageSetColorKey2000;
+        SavageDisplayVideo = SavageDisplayVideo2000;
+    }
     else
     {
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
-    /*DELETENEXTLINE*/
-	/* Since newAdaptor is still NULL, these are still disabled for now. */
+
 	SavageSetColor = SavageSetColorOld;
 	SavageSetColorKey = SavageSetColorKeyOld;
 	SavageDisplayVideo = SavageDisplayVideoOld;
@@ -512,6 +530,55 @@ void SavageSetColorKeyNew(ScrnInfoPtr pScrn)
     }
 }
 
+void SavageSetColorKey2000(ScrnInfoPtr pScrn) 
+{
+    SavagePtr psav = SAVPTR(pScrn);
+    SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
+    int red, green, blue;
+
+    /* Here, we reset the colorkey and all the controls. */
+
+    red = (pPriv->colorKey & pScrn->mask.red) >> pScrn->offset.red;
+    green = (pPriv->colorKey & pScrn->mask.green) >> pScrn->offset.green;
+    blue = (pPriv->colorKey & pScrn->mask.blue) >> pScrn->offset.blue;
+
+    if( !pPriv->colorKey ) {
+        OUTREG( SEC_STREAM_CKEY_LOW, 0 );
+	OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
+        OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+    }
+    else {
+	switch (pScrn->depth) {
+	case 8:
+	    OUTREG( SEC_STREAM_CKEY_LOW, 
+		0x47000000 | (pPriv->colorKey & 0xFF) );
+	    OUTREG( SEC_STREAM_CKEY_UPPER,
+		0x47000000 | (pPriv->colorKey & 0xFF) );
+	    break;
+	case 15:
+	    OUTREG( SEC_STREAM_CKEY_LOW, 
+		0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    OUTREG( SEC_STREAM_CKEY_UPPER, 
+		0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    break;
+	case 16:
+	    OUTREG( SEC_STREAM_CKEY_LOW, 
+		0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
+	    OUTREG( SEC_STREAM_CKEY_UPPER, 
+		0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+	    break;
+	case 24:
+	    OUTREG( SEC_STREAM_CKEY_LOW, 
+		0x47000000 | (red<<16) | (green<<8) | (blue) );
+	    OUTREG( SEC_STREAM_CKEY_UPPER, 
+		0x47000000 | (red<<16) | (green<<8) | (blue) );
+	    break;
+	}    
+
+	/* We assume destination colorkey */
+	OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+    }
+}
 
 void SavageSetColorOld( ScrnInfoPtr pScrn )
 {
@@ -623,6 +690,61 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     }
 }
 
+void SavageSetColor2000( ScrnInfoPtr pScrn )
+{
+    SavagePtr psav = SAVPTR(pScrn);
+    SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
+
+    /* Brightness/contrast/saturation/hue computations. */
+
+    double k, dk1, dk2, dk3, dk4, dk5, dk6, dk7, dkb;
+    int k1, k2, k3, k4, k5, k6, k7, kb;
+    double s = pPriv->saturation / 128.0;
+    double h = pPriv->hue * 0.017453292;
+    unsigned long assembly1, assembly2, assembly3, assembly4;
+
+    xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
+		 pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
+
+    if( psav->videoFourCC == FOURCC_Y211 )
+      k = 1.0;/* YUV */
+    else
+      k = 1.14;/* YCrCb */
+
+
+    dk1 = 128 * k * pPriv->contrast;
+    dk2 = 64.0 * 1.371 * k * s * cos(h);
+    dk3 = -64.0 * 1.371 * k * s * sin(h);
+    dk4 = -128.0 * k * s * (0.698 * cos(h) - 0.336 * sin(h));
+    dk5 = -128.0 * k * s * (0.698 * sin(h) + 0.336 * cos(h));
+    dk6 = 64.0 * 1.732 * k * s * sin(h);/* == k3 / 1.26331, right? */
+    dk7 = 64.0 * 1.732 * k * s * cos(h);/* == k2 / -1.26331, right? */
+    dkb = 128.0 * pPriv->brightness + 0.5;
+    if( psav->videoFourCC != FOURCC_Y211 )
+      dkb = 128 * (pPriv->brightness * k * pPriv->contrast + 0.5); 
+
+    k1 = (int)(dk1 /*+0.5*/) & 0x1ff;
+    k2 = (int)(dk2 /*+0.5*/) & 0x1ff;
+    assembly1 = (k2<<16) | k1;
+
+    k3 = (int)(dk3 /*+0.5*/) & 0x1ff;
+    k4 = (int)(dk4 /*+0.5*/) & 0x1ff;
+    assembly2 = (k4<<16) | k3;
+
+    k5 = (int)(dk5 /*+0.5*/) & 0x1ff;
+    k6 = (int)(dk6 /*+0.5*/) & 0x1ff;
+    assembly3 = (k6<<16) | k5;
+
+    k7 = (int)(dk7 /*+0.5*/) & 0x1ff;
+    kb = (int)(dkb /*+0.5*/) & 0xffff;
+    assembly4 = (kb<<16) | k7;
+
+    OUTREG( SEC_STREAM_COLOR_CONVERT0_2000, assembly1 );
+    OUTREG( SEC_STREAM_COLOR_CONVERT1_2000, assembly2 );
+    OUTREG( SEC_STREAM_COLOR_CONVERT2_2000, assembly3 );
+    OUTREG( SEC_STREAM_COLOR_CONVERT3_2000, assembly4 );
+
+}
 
 void SavageResetVideo(ScrnInfoPtr pScrn) 
 {
@@ -678,6 +800,7 @@ SavageSetupImageVideo(ScreenPtr pScreen)
     xvColorKey   = MAKE_ATOM("XV_COLORKEY");
     xvHue        = MAKE_ATOM("XV_HUE");
     xvSaturation = MAKE_ATOM("XV_SATURATION");
+    /* interpolation option only available on "old" streams */
     xvInterpolation = MAKE_ATOM("XV_VERTICAL_INTERPOLATION");
 
     pPriv->colorKey = 
@@ -1287,32 +1410,18 @@ SavageDisplayVideoNew(
 
     /* Calculate horizontal and vertical scale factors. */
 
-    if( psav->Chipset == S3_SAVAGE2000 )
-    {
-	OUTREG(SEC_STREAM_HSCALING, 
-	    (65536 * src_w / drw_w) & 0x1FFFFF );
-	if( src_w < drw_w )
-	    OUTREG(SEC_STREAM_HSCALE_NORMALIZE,
-		((2048 * src_w / drw_w) & 0x7ff) << 16 );
-	else
-	    OUTREG(SEC_STREAM_HSCALE_NORMALIZE, 2048 << 16 );
-	OUTREG(SEC_STREAM_VSCALING, 
-	    (65536 * src_h / drw_h) & 0x1FFFFF );
-    }
-    else
-    {
-	if ( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) &&
+    if ( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) &&
 	    (psav->DisplayType == MT_LCD) &&
 	    !psav->CrtOnly &&
 	    !psav->TvOn) 
-	{
-	    drw_w = (drw_w * psav->XExp1)/psav->XExp2 + 1;
-	    drw_h = (drw_h * psav->YExp1)/psav->YExp2 + 1;
-	    dstBox->x1 = (dstBox->x1 * psav->XExp1)/psav->XExp2;
-	    dstBox->y1 = (dstBox->y1 * psav->YExp1)/psav->YExp2;
-	    dstBox->x1 += psav->displayXoffset;
-	    dstBox->y1 += psav->displayYoffset;
-	}
+    {
+	drw_w = (drw_w * psav->XExp1)/psav->XExp2 + 1;
+	drw_h = (drw_h * psav->YExp1)/psav->YExp2 + 1;
+	dstBox->x1 = (dstBox->x1 * psav->XExp1)/psav->XExp2;
+	dstBox->y1 = (dstBox->y1 * psav->YExp1)/psav->YExp2;
+	dstBox->x1 += psav->displayXoffset;
+	dstBox->y1 += psav->displayYoffset;
+    }
 
 	if (psav->IsSecondary) {
 	    OUTREG(SEC_STREAM2_HSCALING, 
@@ -1340,7 +1449,6 @@ SavageDisplayVideoNew(
 	        ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
 #endif
 	}
-    }
 
     /*
      * Set surface location and stride.  We use x1>>15 because all surfaces
@@ -1382,6 +1490,82 @@ SavageDisplayVideoNew(
     /* Set color key on primary. */
 
     SavageSetColorKey( pScrn );
+#endif
+
+    /* Set FIFO L2 on second stream. */
+    /* Is CR92 shadowed for crtc2? -- AGD */
+    if( pPriv->lastKnownPitch != pitch )
+    {
+	unsigned char cr92;
+
+	pPriv->lastKnownPitch = pitch;
+	pitch = (pitch + 7) / 8 - 4;
+	VGAOUT8(vgaCRIndex, 0x92);
+	cr92 = VGAIN8(vgaCRReg);
+	VGAOUT8(vgaCRReg, (cr92 & 0x40) | (pitch >> 8) | 0x80);
+	VGAOUT8(vgaCRIndex, 0x93);
+	VGAOUT8(vgaCRReg, pitch);
+    }
+}
+
+static void
+SavageDisplayVideo2000(
+    ScrnInfoPtr pScrn,
+    int id,
+    int offset,
+    short width, short height,
+    int pitch, 
+    int x1, int y1, int x2, int y2,
+    BoxPtr dstBox,
+    short src_w, short src_h,
+    short drw_w, short drw_h
+){
+    SavagePtr psav = SAVPTR(pScrn);
+    vgaHWPtr hwp = VGAHWPTR(pScrn);
+    /*DisplayModePtr mode = pScrn->currentMode;*/
+    SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
+    int vgaCRIndex, vgaCRReg, vgaIOBase;
+
+
+    vgaIOBase = hwp->IOBase;
+    vgaCRIndex = vgaIOBase + 4;
+    vgaCRReg = vgaIOBase + 5;
+
+    if ( psav->videoFourCC != id ) {
+	SavageSetBlend(pScrn,id);
+	SavageResetVideo(pScrn);
+    }
+
+    /* Calculate horizontal and vertical scale factors. */
+
+    OUTREG(SEC_STREAM_HSCALING, 
+	(65536 * src_w / drw_w) & 0x1FFFFF );
+
+    if( src_w < drw_w )
+	OUTREG(SEC_STREAM_HSCALE_NORMALIZE,
+	    ((2048 * src_w / drw_w) & 0x7ff) << 16 );
+    else
+	OUTREG(SEC_STREAM_HSCALE_NORMALIZE, 2048 << 16 );
+
+    OUTREG(SEC_STREAM_VSCALING, 
+	    (65536 * src_h / drw_h) & 0x1FFFFF );
+
+    /*
+     * Set surface location and stride.  We use x1>>15 because all surfaces
+     * are 2 bytes/pixel.
+     */
+
+    OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) 
+       & (0x7ffffff & ~BASE_PAD));
+    OUTREG(SEC_STREAM_STRIDE, pitch & 0xfff );
+    OUTREG(SEC_STREAM_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
+    OUTREG(SEC_STREAM_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+       | (dstBox->x2-dstBox->x1) );
+
+#if 0
+    /* Set color key on primary. */
+
+    SavageSetColor2000( pScrn );
 #endif
 
     /* Set FIFO L2 on second stream. */

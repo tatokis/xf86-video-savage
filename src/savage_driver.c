@@ -1177,55 +1177,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	psav->NoAccel = TRUE;
     }
 
-    /* Set AGP Mode from config */
-    /* We support 1X 2X and 4X  */
-#ifdef XF86DRI
-    from = X_DEFAULT;
-    psav->agpMode = SAVAGE_DEFAULT_AGP_MODE;
-    /*psav->agpMode = SAVAGE_MAX_AGP_MODE;*/
-    psav->agpSize = 16;
-    
-    if (xf86GetOptValInteger(psav->Options,
-                             OPTION_AGP_MODE, &(psav->agpMode))) {
-        if (psav->agpMode < 1) {
-            psav->agpMode = 1;
-        }
-        if (psav->agpMode > SAVAGE_MAX_AGP_MODE) {
-            psav->agpMode = SAVAGE_MAX_AGP_MODE;
-        }
-	if ((psav->agpMode > 2) && 
-	    (psav->Chipset == S3_SAVAGE3D ||
-	     psav->Chipset == S3_SAVAGE_MX))
-		psav->agpMode = 2; /* old savages only support 2x */
-        from = X_CONFIG;
-    }
-
-    xf86DrvMsg(pScrn->scrnIndex, from, "Using AGP %dx mode\n",
-               psav->agpMode);
-
-    if (xf86GetOptValInteger(psav->Options,
-				 OPTION_AGP_SIZE, (int *)&(psav->agpSize))) {
-	switch (psav->agpSize) {
-	case 4:
-	case 8:
-	case 16:
-	case 32:
-	case 64:
-	case 128:
-	case 256:
-	    break;
-	default:
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-			   "Illegal AGP size: %d MB, defaulting to 16 MB\n", psav->agpSize);
-	    psav->agpSize = 16;
-	}
-    }
-
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		   "Using %d MB AGP aperture\n", psav->agpSize);
-
-#endif
-
     /*
      * The SWCursor setting takes priority over HWCursor.  The default
      * if neither is specified is HW, unless ShadowFB is specified,
@@ -1283,45 +1234,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if( xf86GetOptValBool( psav->Options, OPTION_FORCE_INIT, &psav->ForceInit))
 	xf86DrvMsg( pScrn->scrnIndex, X_CONFIG,
 		    "Option: ForceInit enabled\n" );
-
-    /* we can use Option "DisableTile TRUE" to disable tile mode */
-    psav->bDisableTile = FALSE; 
-    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_TILE,&psav->bDisableTile)) {
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                   "Option: %s Tile Mode and Program it \n",(psav->bDisableTile?"Disable":"Enable"));
-    }
-
-#ifdef XF86DRI
-    /* disabled by default...doesn't seem to work */
-    psav->bDisableXvMC = TRUE; /* if you want to free up more mem for DRI,etc. */
-    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_XVMC, &psav->bDisableXvMC)) {
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                   "Option: %s Hardware XvMC support\n",(psav->bDisableXvMC?"Disable":"Enable"));
-    }
-#endif
-
-    psav->disableCOB = FALSE; /* if you are having problems on savage4+ */
-    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_COB, &psav->disableCOB)) {
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                   "Option: %s the COB\n",(psav->disableCOB?"Disable":"Enable"));
-    }
-    if (psav->Chipset == S3_PROSAVAGE ||
-	psav->Chipset == S3_TWISTER   ||
-	psav->Chipset == S3_PROSAVAGEDDR)
-	psav->BCIforXv = TRUE;
-    else
-    	psav->BCIforXv = FALSE; /* use the BCI for Xv */
-    if (xf86GetOptValBool(psav->Options, OPTION_BCI_FOR_XV, &psav->BCIforXv)) {
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                   "Option: %s use of the BCI for Xv\n",(psav->BCIforXv?"Enable":"Disable"));
-    }
-    psav->dvi = FALSE;
-    if (xf86GetOptValBool(psav->Options, OPTION_DVI, &psav->dvi)) {
-        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                   "%s DVI port support (Savage4 only)\n",(psav->dvi?"Force":"Disable"));
-    }
-
-    /* Add more options here. */
 
     if (pScrn->numEntities > 1) {
 	SavageFreeRec(pScrn);
@@ -1384,6 +1296,99 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     	pScrn->videoRam = pEnt->device->videoRam;
 
     xfree(pEnt);
+
+    /* Set AGP Mode from config */
+    /* We support 1X 2X and 4X  */
+#ifdef XF86DRI
+    from = X_DEFAULT;
+    psav->agpMode = SAVAGE_DEFAULT_AGP_MODE;
+    /*psav->agpMode = SAVAGE_MAX_AGP_MODE;*/
+    psav->agpSize = 16;
+    
+    if (xf86GetOptValInteger(psav->Options,
+                             OPTION_AGP_MODE, &(psav->agpMode))) {
+        if (psav->agpMode < 1) {
+            psav->agpMode = 1;
+        }
+        if (psav->agpMode > SAVAGE_MAX_AGP_MODE) {
+            psav->agpMode = SAVAGE_MAX_AGP_MODE;
+        }
+	if ((psav->agpMode > 2) && 
+	    (psav->Chipset == S3_SAVAGE3D ||
+	     psav->Chipset == S3_SAVAGE_MX))
+		psav->agpMode = 2; /* old savages only support 2x */
+        from = X_CONFIG;
+    }
+
+    xf86DrvMsg(pScrn->scrnIndex, from, "Using AGP %dx mode\n",
+               psav->agpMode);
+
+    if (xf86GetOptValInteger(psav->Options,
+				 OPTION_AGP_SIZE, (int *)&(psav->agpSize))) {
+	switch (psav->agpSize) {
+	case 4:
+	case 8:
+	case 16:
+	case 32:
+	case 64:
+	case 128:
+	case 256:
+	    break;
+	default:
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+			   "Illegal AGP size: %d MB, defaulting to 16 MB\n", psav->agpSize);
+	    psav->agpSize = 16;
+	}
+    }
+
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		   "Using %d MB AGP aperture\n", psav->agpSize);
+
+#endif
+
+    /* we can use Option "DisableTile TRUE" to disable tile mode */
+    /* savage2000 tile mode is broken. I suspect it uses different tile sizes from other savages */
+    if (psav->Chipset == S3_SAVAGE2000)
+        psav->bDisableTile = TRUE;
+    else
+        psav->bDisableTile = FALSE; 
+    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_TILE,&psav->bDisableTile)) {
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Option: %s Tile Mode and Program it \n",(psav->bDisableTile?"Disable":"Enable"));
+    }
+
+#ifdef XF86DRI
+    /* disabled by default...doesn't seem to work */
+    psav->bDisableXvMC = TRUE; /* if you want to free up more mem for DRI,etc. */
+    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_XVMC, &psav->bDisableXvMC)) {
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Option: %s Hardware XvMC support\n",(psav->bDisableXvMC?"Disable":"Enable"));
+    }
+#endif
+
+    psav->disableCOB = FALSE; /* if you are having problems on savage4+ */
+    if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_COB, &psav->disableCOB)) {
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Option: %s the COB\n",(psav->disableCOB?"Disable":"Enable"));
+    }
+    if (psav->Chipset == S3_PROSAVAGE ||
+	psav->Chipset == S3_TWISTER   ||
+	psav->Chipset == S3_PROSAVAGEDDR)
+	psav->BCIforXv = TRUE;
+    else
+    	psav->BCIforXv = FALSE; /* use the BCI for Xv */
+    if (xf86GetOptValBool(psav->Options, OPTION_BCI_FOR_XV, &psav->BCIforXv)) {
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Option: %s use of the BCI for Xv\n",(psav->BCIforXv?"Enable":"Disable"));
+    }
+    psav->dvi = FALSE;
+    if (xf86GetOptValBool(psav->Options, OPTION_DVI, &psav->dvi)) {
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "%s DVI port support (Savage4 only)\n",(psav->dvi?"Force":"Disable"));
+    }
+
+    /* Add more options here. */
+
 
     psav               = SAVPTR(pScrn);
     psav->IsSecondary  = FALSE;
@@ -1805,8 +1810,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     i = xf86ValidateModes(pScrn, pScrn->monitor->Modes,
 			  pScrn->display->modes, clockRanges, NULL, 
-			  256, 4096, 16 * pScrn->bitsPerPixel,
-			  128, 4096, 
+			  256, 4095, 16 * pScrn->bitsPerPixel,
+			  128, 4095, 
 			  pScrn->virtualX, pScrn->virtualY,
 			  psav->videoRambytes, LOOKUP_BEST_REFRESH);
 
@@ -3640,6 +3645,9 @@ SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
             OUTREG32(PRI_STREAM2_FBUF_ADDR0, ((address & 0xFFFFFFF8) | 0x80000000));
             OUTREG32(PRI_STREAM2_FBUF_ADDR1, address & 0xFFFFFFF8);
 	}
+    } else if (psav->Chipset == S3_SAVAGE2000) {
+        OUTREG32(PRI_STREAM_FBUF_ADDR0, 0x80000000);
+        OUTREG32(PRI_STREAM_FBUF_ADDR1, address & 0xFFFFFFF8);
     } else {
         OUTREG32(PRI_STREAM_FBUF_ADDR0,address |  0xFFFFFFFC);
         OUTREG32(PRI_STREAM_FBUF_ADDR1,address |  0x80000000);
@@ -4145,7 +4153,6 @@ SavageResetStreams(ScrnInfoPtr pScrn)
 
     /* disable streams */
     switch (psav->Chipset) {
-	case S3_SAVAGE3D:
         case S3_SAVAGE_MX:
         case S3_SUPERSAVAGE:
             OUTREG32(PRI_STREAM_STRIDE,0);
@@ -4161,11 +4168,11 @@ SavageResetStreams(ScrnInfoPtr pScrn)
 	    cr67 &= ~0x02; /* CR67[1] = 1 : enable stream 2 */
             OUTREG8(CRT_DATA_REG, cr67);
             break;
+	case S3_SAVAGE3D:
         case S3_SAVAGE4:
         case S3_TWISTER:
         case S3_PROSAVAGE:            
         case S3_PROSAVAGEDDR:
-        case S3_SAVAGE2000: /* don't know about savage2000 */
             OUTREG32(PRI_STREAM_STRIDE,0);
             OUTREG32(PRI_STREAM_FBUF_ADDR0,0);
             OUTREG32(PRI_STREAM_FBUF_ADDR1,0);
@@ -4177,6 +4184,17 @@ SavageResetStreams(ScrnInfoPtr pScrn)
             cr69 = INREG8(CRT_DATA_REG);
 	    cr69 &= ~0x80; /* CR69[0] = 1 : Mem-mapped regs */
             OUTREG8(CRT_DATA_REG, cr69);
+            break;
+        case S3_SAVAGE2000:
+            OUTREG32(PRI_STREAM_STRIDE,0);
+            OUTREG32(PRI_STREAM_FBUF_ADDR0,0x00000000);
+            OUTREG32(PRI_STREAM_FBUF_ADDR1,0x00000000);
+	    OUTREG8(CRT_ADDRESS_REG, 0x67);
+            cr67 = INREG8(CRT_DATA_REG);
+	    cr67 &= ~0x08; /* CR67[3] = 1 : Mem-mapped regs */
+	    cr67 &= ~0x04; /* CR67[2] = 1 : enable stream 1 */
+	    cr67 &= ~0x02; /* CR67[1] = 1 : enable stream 2 */
+            OUTREG8(CRT_DATA_REG, cr67);
             break;
         default:
             break;

@@ -302,6 +302,48 @@ SavageInitStreamsNew(ScrnInfoPtr pScrn)
     }
 }
 
+static void
+SavageInitStreams2000(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+    /*unsigned long jDelta;*/
+
+    xf86ErrorFVerb(STREAMS_TRACE, "SavageInitStreams\n" );
+
+    OUTREG(PRI_STREAM_BUFFERSIZE,
+         pScrn->virtualX * pScrn->virtualY * (pScrn->bitsPerPixel >> 3));
+
+    if (psav->FBStart2nd) {
+	unsigned long jDelta = pScrn->displayWidth;
+    	OUTREG( PRI_STREAM_BUFFERSIZE, jDelta * pScrn->virtualY >> 3 );
+    	OUTREG( PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset );
+    	OUTREG( PRI_STREAM_STRIDE, jDelta );
+    }
+
+
+    OUTREG( SEC_STREAM_CKEY_LOW, 0 );
+    OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
+    OUTREG( SEC_STREAM_HSCALING, 0 );
+    OUTREG( SEC_STREAM_VSCALING, 0 );
+    OUTREG( BLEND_CONTROL, 0 );
+    OUTREG( SEC_STREAM_FBUF_ADDR0, 0 );
+    OUTREG( SEC_STREAM_FBUF_ADDR1, 0 );
+    OUTREG( SEC_STREAM_FBUF_ADDR2, 0 );
+    OUTREG( SEC_STREAM_WINDOW_START, 0 );
+    OUTREG( SEC_STREAM_WINDOW_SZ, 0 );
+/*  OUTREG( SEC_STREAM_BUFFERSIZE, 0 ); */
+    OUTREG( SEC_STREAM_TILE_OFF, 0 );
+    OUTREG( SEC_STREAM_OPAQUE_OVERLAY, 0 );
+    OUTREG( SEC_STREAM_STRIDE, 0 );
+
+    /* These values specify brightness, contrast, saturation and hue. */
+    OUTREG( SEC_STREAM_COLOR_CONVERT0_2000, 0x0000C892 );
+    OUTREG( SEC_STREAM_COLOR_CONVERT1_2000, 0x00033400 );
+    OUTREG( SEC_STREAM_COLOR_CONVERT2_2000, 0x000001CF );
+    OUTREG( SEC_STREAM_COLOR_CONVERT3_2000, 0x01F1547E );
+
+}
+
 /*
  * Function to get lcd factor, display offset for overlay use
  * Input: pScrn; Output: x,yfactor, displayoffset in pScrn
@@ -465,8 +507,7 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 
     VGAOUT8( vgaCRIndex, EXT_MISC_CTRL2 );
 
-    if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-	(psav->Chipset == S3_SAVAGE2000) )
+    if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) )
     {
 	SavageInitStreamsNew( pScrn );
 
@@ -516,6 +557,22 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 	    OUTREG( SEC_STREAM2_COLOR_CONVERT3, 0x01F1547E );
 #endif
 	}
+    }
+    else if (psav->Chipset == S3_SAVAGE2000)
+    {
+	SavageInitStreams2000( pScrn );
+
+	jStreamsControl = VGAIN8( vgaCRReg ) | ENABLE_STREAM1;
+
+	/* Wait for VBLANK. */	
+	VerticalRetraceWait();
+	/* Fire up streams! */
+	VGAOUT16( vgaCRIndex, (jStreamsControl << 8) | EXT_MISC_CTRL2 );
+	/* These values specify brightness, contrast, saturation and hue. */
+	OUTREG( SEC_STREAM_COLOR_CONVERT0_2000, 0x0000C892 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT1_2000, 0x00033400 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT2_2000, 0x000001CF );
+	OUTREG( SEC_STREAM_COLOR_CONVERT3_2000, 0x01F1547E );
     }
     else
     {
