@@ -48,8 +48,7 @@ SavageI2CPutBits(I2CBusPtr b, int clock,  int data)
     if(clock) reg |= 0x1;
     if(data)  reg |= 0x2;
 
-    /*OutI2CREG(psav,reg);*/ /*tim*/
-    OutI2CREG(reg,psav->DDCPort); /*s3*/
+    OutI2CREG(reg,psav->DDCPort);
     /*ErrorF("SavageI2CPutBits: %d %d\n", clock, data); */
 }
 
@@ -60,8 +59,7 @@ SavageI2CGetBits(I2CBusPtr b, int *clock, int *data)
     SavagePtr psav = SAVPTR(pScrn);
     unsigned char reg = 0x10;
 
-    /*InI2CREG(psav,reg);*/ /*tim*/
-    InI2CREG(reg,psav->DDCPort); /*s3*/
+    InI2CREG(reg,psav->DDCPort);
 
     *clock = reg & 0x4;
     *data = reg & 0x8;
