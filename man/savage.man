@@ -131,9 +131,9 @@ which is slightly more expensive, but avoids the problem.  Default: off
 Disables the COB (Command Overflow Buffer) on savage4 and newer chips.  
 There is supposedly a HW cache coherency problem on certain savage4 and 
 newer chips that renders the COB useless. If you are having problems with 
-2D or 3D acceleration you can disable the COB, however you will lose some 
-performance.  This option only applies to Savage4 and newer chips.  Default: on
-(use COB).
+2D acceleration you can disable the COB, however you will lose some 
+performance.  3D acceleration requires the COB to work.  This option only
+applies to Savage4 and newer chips.  Default: \*qoff\*q (use COB).
 .TP
 .BI "Option \*qBCIforXv\*q \*q" boolean \*q  
 Use the BCI to copy and reformat Xv pixel data.  Using the BCI for Xv causes 
@@ -153,11 +153,28 @@ Set AGP data transfer rate.
 .br
 others \-\- invalid
 .TP
+.BI "Option \*qAGPSize\*q \*q" integer \*q
+The amount of AGP memory that will allocated for DMA and textures in
+MB. Valid sizes are 4, 8, 16, 32, 64, 128 and 256. The default is
+16MB.
+.TP
 .BI "Option \*qCrtOnly\*q \*q" boolean \*q  
 This option disables output to the LCD and enables output to the CRT port only.  
 It is useful on laptops if you only want to use the CRT port or to force the CRT 
 output only on desktop cards that use mobile chips. Default: auto-detect active 
 outputs
+.TP
+.BI "Option \*qDmaType\*q \*q" AGP \*q
+.TP
+.BI "Option \*qDmaType\*q \*q" PCI \*q
+The type of memory that will be used by the 3D driver for DMA (direct
+memory access). \*qPCI\*q works with all hardware but with poor
+performance. \*qAGP\*q only works if you have an AGP card. The default
+is \*qAGP\*q if you have an AGP card, \*qPCI\*q otherwise.
+.TP
+.BI "Option \*qForcePCIMode\*q \*q" boolean \*q
+If you turn this on then PCI memory will be used for DMA and AGP
+textures will be disabled.
 .SH FILES
 savage_drv.o
 .SH "SEE ALSO"
