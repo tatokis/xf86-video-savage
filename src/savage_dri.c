@@ -1643,7 +1643,7 @@ SAVAGEDRIInitBuffers(WindowPtr pWin, RegionPtr prgn, CARD32 index)
     }
 
     cmd[0].clear0.cmd = SAVAGE_CMD_CLEAR;
-    cmd[0].clear0.flags = SAVAGE_FRONT|SAVAGE_BACK|SAVAGE_DEPTH;
+    cmd[0].clear0.flags = SAVAGE_BACK|SAVAGE_DEPTH;
     cmd[1].clear1.mask = 0xffffffff;
     cmd[1].clear1.value = 0;
 
