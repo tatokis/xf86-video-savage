@@ -1568,6 +1568,7 @@ SavageInitAccel(ScreenPtr pScreen)
 	| HARDWARE_PATTERN_PROGRAMMED_BITS 
 	| HARDWARE_PATTERN_SCREEN_ORIGIN
 	| BIT_ORDER_IN_BYTE_MSBFIRST
+	| ROP_NEEDS_SOURCE
 	;
     if( psav->Chipset == S3_SAVAGE4 )
 	xaaptr->Mono8x8PatternFillFlags |= NO_TRANSPARENCY;
