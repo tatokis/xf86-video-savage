@@ -1920,7 +1920,7 @@ SAVAGEDRISetupForScreenToScreenCopy(
     int cmd =0;
 
     cmd = BCI_CMD_RECT | BCI_CMD_DEST_PBD | BCI_CMD_SRC_PBD_COLOR;
-    BCI_CMD_SET_ROP( cmd, XAACopyROP[rop] );
+    BCI_CMD_SET_ROP( cmd, XAAGetCopyROP(rop) );
     if (transparency_color != -1)
         cmd |= BCI_CMD_SEND_COLOR | BCI_CMD_SRC_TRANSPARENT;
 

@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_image.c,v 1.6 2002/05/14 20:19:52 alanh Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_image.c,v 1.4 2001/05/18 23:35:32 dawes Exp $ */
 
 #include "savage_driver.h"
 #include "xaarop.h"
@@ -102,7 +102,7 @@ SavageWriteBitmapCPUToScreenColorExpand (
     cmd = BCI_CMD_RECT | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
         | BCI_CMD_SEND_COLOR | BCI_CMD_CLIP_LR
         | BCI_CMD_DEST_GBD | BCI_CMD_SRC_MONO;
-    cmd |= XAACopyROP[rop] << 16;
+    cmd |= XAAGetCopyROP(rop) << 16;
 
     if( bg == -1 )
         cmd |= BCI_CMD_SRC_TRANSPARENT;
@@ -160,7 +160,7 @@ SavageSetupForImageWrite(
         | BCI_CMD_CLIP_LR
         | BCI_CMD_DEST_GBD | BCI_CMD_SRC_COLOR;
 
-    cmd |= XAACopyROP[rop] << 16;
+    cmd |= XAAGetCopyROP(rop) << 16;
 
     if( transparency_color != -1 )
         cmd |= BCI_CMD_SRC_TRANSPARENT;
