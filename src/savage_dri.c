@@ -79,20 +79,6 @@ SAVAGEDRISubsequentScreenToScreenCopy(
     int w, int h);
 
 
-static void 
-SAVAGEDRISetupForSolidFill(
-    ScrnInfoPtr pScrn, int color, int rop, unsigned planemask);
-
-
-static void 
-SAVAGEDRISubsequentSolidFillRect(
-    ScrnInfoPtr pScrn, int x, int y, int w, int h);
-
-#if 0
-extern int
-SavageHelpSolidROP(ScrnInfoPtr pScrn, int *fg,int pm,int *rop);
-#endif
-
 /* Initialize the visual configs that are supported by the hardware.
  * These are combined with the visual configs that the indirect
  * rendering core supports, and the intersection is exported to the
@@ -1224,23 +1210,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       /* FK: SwapContext no longer used with KERNEL_SWAP. */
    }
 
-#if 0
-   switch( pScrn->bitsPerPixel ) {
-   case 8:
-       pDRIInfo->InitBuffers = Savage8DRIInitBuffers;
-       pDRIInfo->MoveBuffers = Savage8DRIMoveBuffers;
-   case 16:
-       pDRIInfo->InitBuffers = Savage16DRIInitBuffers;
-       pDRIInfo->MoveBuffers = Savage16DRIMoveBuffers;
-   case 24:
-       pDRIInfo->InitBuffers = Savage24DRIInitBuffers;
-       pDRIInfo->MoveBuffers = Savage24DRIMoveBuffers;
-   case 32:
-       pDRIInfo->InitBuffers = Savage32DRIInitBuffers;
-       pDRIInfo->MoveBuffers = Savage32DRIMoveBuffers;
-   }
-#endif
-   
    pDRIInfo->InitBuffers = SAVAGEDRIInitBuffers;
    pDRIInfo->MoveBuffers = SAVAGEDRIMoveBuffers;
    pDRIInfo->OpenFullScreen = SAVAGEDRIOpenFullScreen;
@@ -1344,6 +1313,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
       SAVAGEDRICloseScreen( pScreen );
       return FALSE;
    }
+   psav->LockHeld = 1;
 
    if ( !SAVAGEDRIKernelInit( pScreen ) ) {
       SAVAGEDRICloseScreen( pScreen );
@@ -1521,7 +1491,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textureSize:0x%08x\n",pSAVAGEDRI->textureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logTextureGranularity:0x%08x\n",pSAVAGEDRI->logTextureGranularity );
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureHandle:0x%08x\n",pSAVAGEDRI->agpTextureHandle );
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureHandle:0x%08lx\n",pSAVAGEDRI->agpTextureHandle );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureSize:0x%08x\n",pSAVAGEDRI->agpTextureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRI->logAgpTextureGranularity );
 
@@ -1635,52 +1605,43 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
 void
 SAVAGEDRIInitBuffers(WindowPtr pWin, RegionPtr prgn, CARD32 index)
 {
-#if 0
     ScreenPtr pScreen = pWin->drawable.pScreen;
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
     BoxPtr pbox = REGION_RECTS(prgn);
     int nbox  = REGION_NUM_RECTS(prgn);
-#endif
+    drmSAVAGECmdHeader cmd[2];
+    drmSAVAGECmdbuf cmdBuf;
+    int ret;
 
-#if 0
-    CHECK_DMA_QUIESCENT(SAVPTR(pScrn), pScrn);
-#endif
-#if 0
-    if(!psav->LockHeld)
-       psav->LockHeld = 1;
-    SAVAGEDRISetupForSolidFill(pScrn, 0, GXcopy, -1);
-    while (nbox--) {
-        SAVAGESelectBuffer(pScrn, SAVAGE_BACK);
-        SAVAGEDRISubsequentSolidFillRect(pScrn, pbox->x1, pbox->y1,
-					 pbox->x2-pbox->x1, pbox->y2-pbox->y1);
-        SAVAGESelectBuffer(pScrn, SAVAGE_DEPTH);
-        SAVAGEDRISubsequentSolidFillRect(pScrn, pbox->x1, pbox->y1,
-					 pbox->x2-pbox->x1, pbox->y2-pbox->y1);
-        pbox++;
+    if (!psav->LockHeld) {
+	xf86DrvMsg( pScrn->scrnIndex, X_WARNING,
+		    "Not holding the lock in InitBuffers.\n");
+	return;
     }
-#endif
-#if 0
-    {
-       SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
-       unsigned int *bcicmd;
-       BCI_GET_PTR;
-       /*bcicmd = (unsigned int *) psav->BciMem;
-       *(bcicmd) = 0x4BCC8000;
-       *(bcicmd) = 0x00F80000;
-       *(bcicmd) = 0x02000200;
-       *(bcicmd) = 0x01000100;*/
-       BCI_SEND(0x4BCC8000);
-       BCI_SEND(0x00F80000);
-       BCI_SEND(0x02000200);
-       BCI_SEND(0x01000100);
-       sleep(5);
+
+    cmd[0].clear0.cmd = SAVAGE_CMD_CLEAR;
+    cmd[0].clear0.flags = SAVAGE_FRONT|SAVAGE_BACK|SAVAGE_DEPTH;
+    cmd[1].clear1.mask = 0xffffffff;
+    cmd[1].clear1.value = 0;
+
+    cmdBuf.cmd_addr = cmd;
+    cmdBuf.size = 2;
+    cmdBuf.dma_idx = 0;
+    cmdBuf.discard = 0;
+    cmdBuf.vb_addr = NULL;
+    cmdBuf.vb_size = 0;
+    cmdBuf.vb_stride = 0;
+    cmdBuf.box_addr = (drm_clip_rect_t*)pbox;
+    cmdBuf.nbox = nbox;
+
+    ret = drmCommandWrite(psav->drmFD, DRM_SAVAGE_BCI_CMDBUF,
+			  &cmdBuf, sizeof(cmdBuf));
+    if (ret < 0) {
+	xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
+		    "SAVAGEDRIInitBuffers: drmCommandWrite returned %d.\n",
+		    ret);
     }
-#endif
-#if 0
-    SAVAGESelectBuffer(pScrn, SAVAGE_FRONT);
-    psav->AccelInfoRec->NeedToSync = TRUE;
-#endif
 }
 
 /*
@@ -1705,13 +1666,11 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
     DDXPointPtr pptSrc;
     int screenwidth = pScrn->virtualX;
     int screenheight = pScrn->virtualY;
+    BCI_GET_PTR;
 
-#if 1
-#if 0
-    CHECK_DMA_QUIESCENT(SAVPTR(pScrn), pScrn);
-#endif
-    if(!psav->LockHeld)
-       psav->LockHeld = 1;
+    if (!psav->LockHeld) {
+	xf86DrvMsg( pScrn->scrnIndex, X_INFO, "Not holding lock in MoveBuffers\n");
+    }
 
     pbox = REGION_RECTS(prgnSrc);
     nbox = REGION_NUM_RECTS(prgnSrc);
@@ -1798,7 +1757,8 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
         /* No changes are needed */
         xdir = 1;
     }
-#if 0
+
+    BCI_SEND(0xc0030000); /* wait for 2D+3D idle */
     SAVAGEDRISetupForScreenToScreenCopy(pScrn, xdir, ydir, GXcopy, -1, -1);
     for ( ; nbox-- ; pbox++)
      {
@@ -1834,9 +1794,8 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
         DEALLOCATE_LOCAL(pboxNew1);
     }
 
+    BCI_SEND(0xc0020000); /* wait for 2D idle */
     psav->AccelInfoRec->NeedToSync = TRUE;
-#endif
-#endif
 }
 
 static void 
@@ -1899,73 +1858,6 @@ SAVAGEDRISubsequentScreenToScreenCopy(
     BCI_SEND(BCI_X_Y(x2, y2));
     BCI_SEND(BCI_W_H(w, h));
 
-}
-
-
-/*
- * SetupForSolidFill is also called to set up for lines.
- */ 
-#if 0
-static void 
-SAVAGEDRISetupForSolidFill(
-    ScrnInfoPtr pScrn,
-    int color, 
-    int rop,
-    unsigned planemask)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    XAAInfoRecPtr xaaptr = GET_XAAINFORECPTR_FROM_SCRNINFOPTR( pScrn );
-    int cmd;
-    int mix;
-
-    cmd = BCI_CMD_RECT
-        | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
-        | BCI_CMD_DEST_PBD | BCI_CMD_SRC_SOLID;
-
-    /* Don't send a color if we don't have to. */
-
-    if( rop == GXcopy )
-    {
-	if( color == 0 )
-	    rop = GXclear;
-	else if( color == xaaptr->FullPlanemask )
-	    rop = GXset;
-    }
-
-#if 1
-    mix = SavageHelpSolidROP( pScrn, &color, planemask, &rop );
-#endif
-    if( mix & ROP_PAT )
-	cmd |= BCI_CMD_SEND_COLOR;
-
-    BCI_CMD_SET_ROP( cmd, rop );
-
-    psav->SavedBciCmd = cmd;
-    psav->SavedFgColor = color;
-}
-#endif    
-    
-static void 
-SAVAGEDRISubsequentSolidFillRect(
-    ScrnInfoPtr pScrn,
-    int x,
-    int y,
-    int w,
-    int h)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    BCI_GET_PTR;
-    
-    if( !w || !h )
-	return;
-
-    psav->WaitQueue(psav,5);
-
-    BCI_SEND(psav->SavedBciCmd);
-    if( psav->SavedBciCmd & BCI_CMD_SEND_COLOR )
-	BCI_SEND(psav->SavedFgColor);
-    BCI_SEND(BCI_X_Y(x, y));
-    BCI_SEND(BCI_W_H(w, h));
 }
 
 
