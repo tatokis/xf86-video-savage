@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.c,v 1.49 2003/11/06 18:38:06 tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.c,v 1.48tsi Exp $ */
 /*
  * vim: sw=4 ts=8 ai ic:
  *
@@ -323,7 +323,7 @@ static XF86ModuleVersionInfo SavageVersRec = {
     MODULEVENDORSTRING,
     MODINFOSTRING1,
     MODINFOSTRING2,
-    XF86_VERSION_CURRENT,
+    XORG_VERSION_CURRENT,
     VERSION_MAJOR, VERSION_MINOR, PATCHLEVEL,
     ABI_CLASS_VIDEODRV,
     ABI_VIDEODRV_VERSION,
@@ -1481,7 +1481,13 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
     gpScrn = pScrn;
     SavageEnableMMIO(pScrn);
     SavageSave(pScrn);
-    return SavageModeInit(pScrn, pScrn->currentMode);
+    if(SavageModeInit(pScrn, pScrn->currentMode)) {
+	/* some BIOSes seem to enable HW cursor on PM resume */
+	if (!SAVPTR(pScrn)->hwc_on)
+	    SavageHideCursor( pScrn ); 
+	return TRUE;
+    }
+    return FALSE;
 }
 
 
