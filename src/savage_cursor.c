@@ -1,4 +1,4 @@
-/* $XFree86$ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_cursor.c,v 1.9 2003/01/18 15:22:29 eich Exp $ */
 
 /*
  * Hardware cursor support for S3 Savage 4.0 driver. Taken with

@@ -1,4 +1,4 @@
-/* $XFree86$ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_shadow.c,v 1.2 2002/05/14 20:19:52 alanh Exp $ */
 
 /*
    Copyright (c) 1999,2000  The XFree86 Project Inc. 
