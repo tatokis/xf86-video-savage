@@ -733,6 +733,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
    unsigned long mode;
    unsigned int vendor, device;
+   unsigned int offset;
    int ret;
    /*int size,numbuffer,i;
    savageAgpBufferPtr agpbuffer;*/
@@ -742,14 +743,23 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
    pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size; /* ? */
 
-   if (psav->AgpDMA) {
-       pSAVAGEDRIServer->buffers.offset = 0;
-       pSAVAGEDRIServer->buffers.size = SAVAGE_NUM_BUFFERS * SAVAGE_BUFFER_SIZE;
+   offset = 0;
+
+   if ( psav->AgpDMA ) {
+       if ( psav->CommandDMA ) {
+	   pSAVAGEDRIServer->cmdDma.offset = offset;
+	   pSAVAGEDRIServer->cmdDma.size = SAVAGE_CMDDMA_SIZE;
+	   offset += pSAVAGEDRIServer->cmdDma.size;
+       } else if ( psav->VertexDMA ) {
+	   pSAVAGEDRIServer->buffers.offset = 0;
+	   pSAVAGEDRIServer->buffers.size = SAVAGE_NUM_BUFFERS * SAVAGE_BUFFER_SIZE;
+	   offset += pSAVAGEDRIServer->buffers.size;
+       }
    }
 
-   pSAVAGEDRIServer->agpTextures.offset = pSAVAGEDRIServer->buffers.size;
-   pSAVAGEDRIServer->agpTextures.size = (pSAVAGEDRIServer->agp.size -
-					 pSAVAGEDRIServer->buffers.size);
+   pSAVAGEDRIServer->agpTextures.offset = offset;
+   pSAVAGEDRIServer->agpTextures.size = (pSAVAGEDRIServer->agp.size - offset);
+   offset += pSAVAGEDRIServer->agpTextures.size;
 
    if ( drmAgpAcquire( psav->drmFD ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not available\n" );
@@ -807,31 +817,59 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    /* DMA buffers
     */
    if ( psav->AgpDMA ) {
-       if ( drmAddMap( psav->drmFD,
-		       pSAVAGEDRIServer->buffers.offset,
-		       pSAVAGEDRIServer->buffers.size,
-		       DRM_AGP, 0,
-		       &pSAVAGEDRIServer->buffers.handle ) < 0 ) {
-	   xf86DrvMsg( pScreen->myNum, X_ERROR,
-		       "[agp] Could not add DMA buffers mapping\n" );
-	   return FALSE;
+       if ( psav->CommandDMA ) {
+	   if ( drmAddMap( psav->drmFD,
+			   pSAVAGEDRIServer->cmdDma.offset,
+			   pSAVAGEDRIServer->cmdDma.size,
+			   DRM_AGP, DRM_RESTRICTED | DRM_KERNEL,
+			   &pSAVAGEDRIServer->cmdDma.handle ) < 0 ) {
+	       xf86DrvMsg( pScreen->myNum, X_ERROR,
+			   "[agp] Could not add command DMA mapping\n" );
+	       return FALSE;
+	   }
+	   xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[agp] command DMA handle = 0x%08lx\n",
+		       pSAVAGEDRIServer->cmdDma.handle );
+	   /* not needed in the server
+	   if ( drmMap( psav->drmFD,
+			pSAVAGEDRIServer->cmdDma.handle,
+			pSAVAGEDRIServer->cmdDma.size,
+			&pSAVAGEDRIServer->cmdDma.map ) < 0 ) {
+	       xf86DrvMsg( pScreen->myNum, X_ERROR,
+			   "[agp] Could not map command DMA\n" );
+	       return FALSE;
+	   }
+	   xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[agp] command DMA mapped at 0x%08lx\n",
+		       (unsigned long)pSAVAGEDRIServer->cmdDma.map );
+	   */
+       } else if ( psav->VertexDMA ) {
+	   if ( drmAddMap( psav->drmFD,
+			   pSAVAGEDRIServer->buffers.offset,
+			   pSAVAGEDRIServer->buffers.size,
+			   DRM_AGP, 0,
+			   &pSAVAGEDRIServer->buffers.handle ) < 0 ) {
+	       xf86DrvMsg( pScreen->myNum, X_ERROR,
+			   "[agp] Could not add DMA buffers mapping\n" );
+	       return FALSE;
+	   }
+	   xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[agp] DMA buffers handle = 0x%08lx\n",
+		       pSAVAGEDRIServer->buffers.handle );
+	   /* not needed in the server
+	   if ( drmMap( psav->drmFD,
+			pSAVAGEDRIServer->buffers.handle,
+			pSAVAGEDRIServer->buffers.size,
+			&pSAVAGEDRIServer->buffers.map ) < 0 ) {
+	       xf86DrvMsg( pScreen->myNum, X_ERROR,
+			   "[agp] Could not map DMA buffers\n" );
+	       return FALSE;
+	   }
+	   xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[agp] DMA buffers mapped at 0x%08lx\n",
+		       (unsigned long)pSAVAGEDRIServer->buffers.map );
+	   */
        }
-       xf86DrvMsg( pScreen->myNum, X_INFO,
-		   "[agp] DMA buffers handle = 0x%08lx\n",
-		   pSAVAGEDRIServer->buffers.handle );
-       /* not needed in the server
-       if ( drmMap( psav->drmFD,
-		    pSAVAGEDRIServer->buffers.handle,
-		    pSAVAGEDRIServer->buffers.size,
-		    &pSAVAGEDRIServer->buffers.map ) < 0 ) {
-	   xf86DrvMsg( pScreen->myNum, X_ERROR,
-		       "[agp] Could not map DMA buffers\n" );
-	   return FALSE;
-       }
-       xf86DrvMsg( pScreen->myNum, X_INFO,
-		   "[agp] DMA buffers mapped at 0x%08lx\n",
-		   (unsigned long)pSAVAGEDRIServer->buffers.map );
-       */
    }
 
    /* AGP textures
@@ -847,7 +885,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    }
    /*   pSAVAGEDRIServer->agp_offset=pSAVAGEDRIServer->agpTexture.size;*/
    xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[agp] agpTextures microcode handle = 0x%08lx\n",
+	       "[agp] agpTextures handle = 0x%08lx\n",
 	       pSAVAGEDRIServer->agpTextures.handle );
 
    /* not needed in the server
@@ -931,40 +969,55 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    
    }*/
 
-   /* Always enable ShadowStatus for direct rendering. */
-   if ( !psav->ShadowStatus ) {
-       psav->ShadowStatus = 1;
+   if ( !psav->AgpDMA && psav->CommandDMA ) {
+       pSAVAGEDRIServer->cmdDma.size = SAVAGE_CMDDMA_SIZE;
+       if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->cmdDma.size,
+		       DRM_CONSISTENT, DRM_RESTRICTED | DRM_LOCKED |
+		       DRM_KERNEL | DRM_WRITE_COMBINING,
+		       &pSAVAGEDRIServer->cmdDma.handle ) < 0 ) {
+	   psav->CommandDMA = FALSE;
+	   xf86DrvMsg( pScreen->myNum, X_WARNING,
+		       "[drm] Could not add PCI command DMA mapping\n" );
+       } else
+	   xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[drm] PCI command DMA handle = 0x%08lx\n",
+		       pSAVAGEDRIServer->cmdDma.handle );
+   }
+
+   /* Enable ShadowStatus by default for direct rendering. */
+   if ( !psav->ShadowStatus && !psav->ForceShadowStatus ) {
+       psav->ShadowStatus = TRUE;
        xf86DrvMsg( pScreen->myNum, X_INFO,
 		   "[drm] Enabling ShadowStatus for DRI.\n" );
+
+       pSAVAGEDRIServer->status.size = 4096; /* 1 page */
+
+       if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
+		       DRM_CONSISTENT, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
+		       &pSAVAGEDRIServer->status.handle ) < 0 ) {
+	   xf86DrvMsg( pScreen->myNum, X_ERROR,
+		       "[drm] Could not add status page mapping\n" );
+	   return FALSE;
+       }
+       xf86DrvMsg( pScreen->myNum, X_INFO,
+		   "[drm] Status handle = 0x%08lx\n",
+		   pSAVAGEDRIServer->status.handle );
+
+       if ( drmMap( psav->drmFD,
+		    pSAVAGEDRIServer->status.handle,
+		    pSAVAGEDRIServer->status.size,
+		    &pSAVAGEDRIServer->status.map ) < 0 ) {
+	   xf86DrvMsg( pScreen->myNum, X_ERROR,
+		       "[drm] Could not map status page\n" );
+	   return FALSE;
+       }
+       xf86DrvMsg( pScreen->myNum, X_INFO,
+		   "[drm] Status page mapped at 0x%08lx\n",
+		   (unsigned long)pSAVAGEDRIServer->status.map );
+
+       psav->ShadowPhysical = pSAVAGEDRIServer->status.handle;
+       psav->ShadowVirtual = pSAVAGEDRIServer->status.map;
    }
-
-   pSAVAGEDRIServer->status.size = 4096; /* 1 page */
-
-   if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
-		   DRM_CONSISTENT, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
-		   &pSAVAGEDRIServer->status.handle ) < 0 ) {
-       xf86DrvMsg( pScreen->myNum, X_ERROR,
-		   "[drm] Could not add status page mapping\n" );
-       return FALSE;
-   }
-   xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[drm] Status handle = 0x%08lx\n",
-	       pSAVAGEDRIServer->status.handle );
-
-   if ( drmMap( psav->drmFD,
-		pSAVAGEDRIServer->status.handle,
-		pSAVAGEDRIServer->status.size,
-		&pSAVAGEDRIServer->status.map ) < 0 ) {
-       xf86DrvMsg( pScreen->myNum, X_ERROR,
-		   "[drm] Could not map status page\n" );
-       return FALSE;
-   }
-   xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[drm] Status page mapped at 0x%08lx\n",
-	       (unsigned long)pSAVAGEDRIServer->status.map );
-
-   psav->ShadowPhysical = pSAVAGEDRIServer->status.handle;
-   psav->ShadowVirtual = pSAVAGEDRIServer->status.map;
 
    return TRUE;
 }
@@ -975,6 +1028,13 @@ static Bool SAVAGEDRIBuffersInit( ScreenPtr pScreen )
    SavagePtr psav = SAVPTR(pScrn);
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
    int count;
+
+   if ( !psav->VertexDMA || psav->CommandDMA ) {
+       /* At this point psav->CommandDMA == TRUE means that CommandDMA
+	* allocation was actually successful. */
+       psav->VertexDMA = FALSE;
+       return TRUE;
+   }
 
    if ( psav->AgpDMA ) {
        count = drmAddBufs( psav->drmFD,
@@ -1042,8 +1102,18 @@ static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
    init.texture_size    = pSAVAGEDRIServer->textureSize;
 
    init.status_offset   = pSAVAGEDRIServer->status.handle;
-   init.buffers_offset  = pSAVAGEDRIServer->buffers.handle;
    init.agp_textures_offset = pSAVAGEDRIServer->agpTextures.handle;
+
+   /* Savage4-based chips with DRM version >= 2.4 support command DMA,
+    * which is preferred because it works with all vertex
+    * formats. Command DMA and vertex DMA don't work at the same
+    * time. */
+   init.buffers_offset = 0;
+   init.cmd_dma_offset = 0;
+   if ( psav->CommandDMA )
+       init.cmd_dma_offset = pSAVAGEDRIServer->cmdDma.handle;
+   else if ( psav->VertexDMA )
+       init.buffers_offset = pSAVAGEDRIServer->buffers.handle;
 
    ret = drmCommandWrite( psav->drmFD, DRM_SAVAGE_BCI_INIT, &init, sizeof(init) );
    if ( ret < 0 ) {
@@ -1251,7 +1321,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
             /* incompatible drm version */
             xf86DrvMsg( pScreen->myNum, X_ERROR,
 			"[dri] SAVAGEDRIScreenInit failed because of a version mismatch.\n"
-			"[dri] savage.o kernel module version is %d.%d.%d but version 2.0.x is needed.\n"
+			"[dri] savage.ko kernel module version is %d.%d.%d but version 2.0.x is needed.\n"
 			"[dri] Disabling DRI.\n",
 			version->version_major,
 			version->version_minor,
@@ -1260,6 +1330,18 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
 	    SAVAGEDRICloseScreen( pScreen );		/* FIXME: ??? */
             return FALSE;
          }
+	 if ( psav->CommandDMA && version->version_minor < 4 ) {
+	    xf86DrvMsg( pScreen->myNum, X_WARNING,
+			"[drm] DRM version < 2.4.0 does not support command DMA.\n");
+	    psav->CommandDMA = FALSE;
+	 }
+	 if ( !psav->VertexDMA && version->version_minor < 4 ) {
+	    xf86DrvMsg( pScreen->myNum, X_ERROR,
+			"[drm] DRM version < 2.4.0 requires vertex DMA.\n");
+	    drmFreeVersion( version );
+	    SAVAGEDRICloseScreen( pScreen );
+	    return FALSE;
+	 }
          drmFreeVersion( version );
       }
    }
@@ -1483,6 +1565,11 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRIServer->logAgpTextureGranularity); 
 
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:handle:0x%08lx\n",pSAVAGEDRIServer->cmdDma.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:offset:0x%08x\n",pSAVAGEDRIServer->cmdDma.offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:size:0x%08x\n",pSAVAGEDRIServer->cmdDma.size);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->cmdDma.map);
+   
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]pSAVAGEDRI:\n" );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	chipset:0x%08x\n",pSAVAGEDRI->chipset );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	width:0x%08x\n",pSAVAGEDRI->width );

@@ -234,6 +234,7 @@ typedef struct _Savage {
     double		LCDClock;
     Bool		ConfigShadowStatus; /* from the config */
     Bool		ShadowStatus;       /* automatically enabled with DRI */
+    Bool		ForceShadowStatus;  /* true if explicitly set in conf */
     Bool		CrtOnly;
     Bool		TvOn;
     Bool		PAL;
@@ -340,6 +341,8 @@ typedef struct _Savage {
 
     Bool		IsPCI;
     Bool		AgpDMA;
+    Bool		VertexDMA;
+    Bool		CommandDMA;
     int 		agpMode;
     drmSize		agpSize;
     FBLinearPtr		reserved;

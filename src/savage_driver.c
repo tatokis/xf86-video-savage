@@ -213,6 +213,7 @@ typedef enum {
     ,OPTION_DVI
     ,OPTION_BUS_TYPE
     ,OPTION_DMA_TYPE
+    ,OPTION_DMA_MODE
     ,OPTION_AGP_MODE
     ,OPTION_AGP_SIZE
 } SavageOpts;
@@ -243,6 +244,7 @@ static const OptionInfoRec SavageOptions[] =
 #ifdef XF86DRI
     { OPTION_BUS_TYPE,	"BusType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_DMA_TYPE,	"DmaType",	OPTV_ANYSTR,  {0}, FALSE },
+    { OPTION_DMA_MODE,  "DmaMode",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_AGP_MODE,	"AGPMode",	OPTV_INTEGER, {0}, FALSE },
     { OPTION_AGP_SIZE,	"AGPSize",	OPTV_INTEGER, {0}, FALSE },
 #endif
@@ -1223,9 +1225,12 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg( pScrn->scrnIndex, X_CONFIG, 
 		    "Option: LCDClock %1.2f MHz\n", psav->LCDClock );
 
-    if( xf86GetOptValBool( psav->Options, OPTION_SHADOW_STATUS, &psav->ShadowStatus))
+    if( xf86GetOptValBool( psav->Options, OPTION_SHADOW_STATUS, &psav->ShadowStatus)) {
 	xf86DrvMsg( pScrn->scrnIndex, X_CONFIG,
-		    "Option: ShadowStatus enabled\n" );
+		    "Option: ShadowStatus %sabled\n", psav->ShadowStatus ? "en" : "dis" );
+	psav->ForceShadowStatus = TRUE;
+    } else
+	psav->ForceShadowStatus = FALSE;
     /* If ShadowStatus is off it will be automatically enabled for DRI.
      * If DRI initialization fails fall back to ConfigShadowStatus. */
     psav->ConfigShadowStatus = psav->ShadowStatus;
@@ -1426,6 +1431,36 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_DEFAULT,
 		   "Using %s DMA\n", psav->AgpDMA ? "AGP" : "PCI");
     }
+
+    psav->CommandDMA = TRUE;
+    psav->VertexDMA = TRUE;
+    from = X_DEFAULT;
+    if ((s = xf86GetOptValString(psav->Options, OPTION_DMA_MODE))) {
+	from = X_CONFIG;
+	if (strcmp(s, "Command") == 0)
+	    psav->VertexDMA = FALSE;
+	else if (strcmp(s, "Vertex") == 0)
+	    psav->CommandDMA = FALSE;
+	else if (strcmp(s, "None") == 0)
+	    psav->VertexDMA = psav->CommandDMA = FALSE;
+	else if (strcmp(s, "Any") != 0) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "Invalid DmaMode option\n");
+	    from = X_DEFAULT;
+	}
+    }
+    psav->CommandDMA = (psav->CommandDMA && !S3_SAVAGE3D_SERIES(psav->Chipset));
+    if (psav->CommandDMA && psav->VertexDMA)
+	xf86DrvMsg(pScrn->scrnIndex, from,
+		   "Will try command and vertex DMA mode\n");
+    else if (psav->CommandDMA && !psav->VertexDMA)
+	xf86DrvMsg(pScrn->scrnIndex, from,
+		   "Will try only command DMA mode\n");
+    else if (!psav->CommandDMA && psav->VertexDMA)
+	xf86DrvMsg(pScrn->scrnIndex, from,
+		   "Will try only vertex DMA mode\n");
+    else
+	xf86DrvMsg(pScrn->scrnIndex, from,
+		   "DMA disabled\n");
 
     if (!psav->IsPCI) {
 	from = X_DEFAULT;
@@ -3026,13 +3061,14 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
         /* Setup DRI after visuals have been established */
         psav->directRenderingEnabled = SAVAGEDRIScreenInit(pScreen);
 	/* If DRI init failed, reset shadow status. */
-	if (!psav->directRenderingEnabled) {
+	if (!psav->directRenderingEnabled &&
+	    psav->ShadowStatus != psav->ConfigShadowStatus) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Resetting ShadowStatus.\n");
 	    SavageInitShadowStatus(pScrn);
 	}
 	/* If shadow status was enabled for DRI, hook up the shadow
 	 * waiting functions now. */
-	else if (!psav->ConfigShadowStatus) {
+	else if (psav->ShadowStatus && !psav->ConfigShadowStatus) {
 	    psav->WaitQueue = ShadowWaitQueue;
 	    psav->WaitIdle = ShadowWait;
 	    psav->WaitIdleEmpty = ShadowWait;
@@ -3211,7 +3247,8 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
         psav->directRenderingEnabled = SAVAGEDRIFinishScreenInit(pScreen);
 	/* If DRI initialization failed, reset shadow status and
 	 * reinitialize 2D engine. */
-	if (!psav->directRenderingEnabled) {
+	if (!psav->directRenderingEnabled &&
+	    psav->ShadowStatus != psav->ConfigShadowStatus) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Resetting ShadowStatus.\n");
 	    SavageInitShadowStatus(pScrn);
 	    SavageInitialize2DEngine(pScrn);

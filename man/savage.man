@@ -127,11 +127,13 @@ Default: on (use the BIOS).
 Enables the use of a shadow status register.  There is a chip bug in the 
 Savage graphics engine that can cause a bus lock when reading the engine
 status register under heavy load, such as when scrolling text or dragging
-windows.  The bug affects about 4% of all Savage users.  If your system
+windows.  The bug affects about 4% of all Savage users without DRI and
+a large fraction of users with DRI.  If your system
 hangs regularly while scrolling text or dragging windows, try turning this
 option on.  This uses an alternate method of reading the engine status
-which is slightly more expensive, but avoids the problem.  Default: off
-(use normal status register).
+which is slightly more expensive, but avoids the problem.  When DRI is
+enabled then the default is \*qon\*q (use shadow status), otherwise
+the default is \*qoff\*q (use normal status register).
 .TP
 .BI "Option \*qDisableCOB\*q \*q" boolean \*q
 Disables the COB (Command Overflow Buffer) on savage4 and newer chips.  
@@ -163,6 +165,23 @@ others \-\- invalid
 The amount of AGP memory that will allocated for DMA and textures in
 MB. Valid sizes are 4, 8, 16, 32, 64, 128 and 256. The default is
 16MB.
+.TP
+.BI "Option \*qDmaMode\*q \*q" string \*q
+This option influences in which way DMA (direct memory access) is used
+by the kernel and 3D drivers.
+.br
+Any      \-\- Try command DMA first, then vertex DMA (default)
+.br
+Command  \-\- Only use command DMA or don't use DMA at all
+.br
+Vertex   \-\- Only use vertex DMA or don't use DMA at all
+.br
+None     \-\- Disable DMA
+.br
+Command and vertex DMA cannot be enabled at the same time. Which DMA
+mode is actually used in the end also depends on the DRM version (only
+>= 2.4.0 supports command DMA) and the hardware (Savage3D/MX/IX
+doesn't support command DMA).
 .TP
 .BI "Option \*qDmaType\*q \*q" string \*q
 The type of memory that will be used by the 3D driver for DMA (direct

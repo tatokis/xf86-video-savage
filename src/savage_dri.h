@@ -34,6 +34,8 @@
 #define SAVAGE_NUM_BUFFERS 32
 #define SAVAGE_BUFFER_SIZE (1 << 16) /* 64k */
 
+#define SAVAGE_CMDDMA_SIZE 0x100000 /* 1MB */
+
 #define SAVAGE_DEFAULT_AGP_MODE     1
 #define SAVAGE_MAX_AGP_MODE         4
 
@@ -100,6 +102,9 @@ typedef struct _server{
    drmRegion buffers;
    drmRegion agpTextures;
    int logAgpTextureGranularity;
+
+   /* command DMA */
+   drmRegion cmdDma;
 
 #if 0
    drmBufMapPtr drmBuffers;
