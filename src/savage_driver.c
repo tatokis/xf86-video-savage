@@ -3428,7 +3428,7 @@ SavageDDC1(int scrnIndex)
     OutI2CREG(psav,tmp | 0x12);
     
     if ((pMon = xf86PrintEDID(
-	xf86DoEDID_DDC1(scrnIndex,LoaderSymbol("vgaHWddc1SetSpeed"),
+	xf86DoEDID_DDC1(scrnIndex,vgaHWddc1SetSpeedWeak(),
 	                SavageDDC1Read))) != NULL)
 	success = TRUE;
     xf86SetDDCproperties(pScrn,pMon);
