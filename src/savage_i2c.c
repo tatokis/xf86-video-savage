@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_i2c.c,v 1.3 2002/10/02 20:39:55 alanh Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_i2c.c,v 1.1 2001/02/13 21:15:19 dawes Exp $ */
 
 /*
 Copyright (C) 1994-2000 The XFree86 Project, Inc.  All Rights Reserved.
@@ -48,7 +48,8 @@ SavageI2CPutBits(I2CBusPtr b, int clock,  int data)
     if(clock) reg |= 0x1;
     if(data)  reg |= 0x2;
 
-    OutI2CREG(psav,reg);
+    /*OutI2CREG(psav,reg);*/ /*tim*/
+    OutI2CREG(reg,psav->DDCPort); /*s3*/
     /*ErrorF("SavageI2CPutBits: %d %d\n", clock, data); */
 }
 
@@ -59,7 +60,8 @@ SavageI2CGetBits(I2CBusPtr b, int *clock, int *data)
     SavagePtr psav = SAVPTR(pScrn);
     unsigned char reg = 0x10;
 
-    InI2CREG(psav,reg);
+    /*InI2CREG(psav,reg);*/ /*tim*/
+    InI2CREG(reg,psav->DDCPort); /*s3*/
 
     *clock = reg & 0x4;
     *data = reg & 0x8;

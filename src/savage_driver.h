@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.h,v 1.17 2003/04/23 14:18:37 eich Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_driver.h,v 1.11 2001/08/09 19:14:13 dawes Exp $ */
 
 #ifndef SAVAGE_VGAHWMMIO_H
 #define SAVAGE_VGAHWMMIO_H
@@ -21,6 +21,30 @@
 #include "xf86xv.h"
 
 #include "savage_regs.h"
+#include "savage_vbe.h"
+
+#ifdef XF86DRI
+#define _XF86DRI_SERVER_
+#include "savage_dripriv.h"
+#include "savage_dri.h"
+#include "savage_drm.h"
+#include "dri.h"
+#include "GL/glxint.h"
+#endif
+
+
+#ifndef uint
+typedef unsigned int            uint;
+#endif
+#ifndef ulong
+typedef unsigned long           ulong;
+#endif
+#ifndef ushort
+typedef unsigned short          ushort;
+#endif
+#ifndef uchar
+typedef unsigned char           uchar;
+#endif
 
 #define VGAIN8(addr) MMIO_IN8(psav->MapBase+0x8000, addr)
 #define VGAIN16(addr) MMIO_IN16(psav->MapBase+0x8000, addr)
@@ -30,10 +54,26 @@
 #define VGAOUT16(addr,val) MMIO_OUT16(psav->MapBase+0x8000, addr, val)
 #define VGAOUT(addr,val) MMIO_OUT32(psav->MapBase+0x8000, addr, val)
 
-#define INREG(addr) MMIO_IN32(psav->MapBase, addr)
-#define OUTREG(addr,val) MMIO_OUT32(psav->MapBase, addr, val)
+#define INREG8(addr) MMIO_IN8(psav->MapBase, addr)
 #define INREG16(addr) MMIO_IN16(psav->MapBase, addr)
+#define INREG32(addr) MMIO_IN32(psav->MapBase, addr)
+#define OUTREG8(addr,val) MMIO_OUT8(psav->MapBase, addr, val)
 #define OUTREG16(addr,val) MMIO_OUT16(psav->MapBase, addr, val)
+#define OUTREG32(addr,val) MMIO_OUT32(psav->MapBase, addr, val)
+#define INREG(addr) INREG32(addr) 
+#define OUTREG(addr,val) OUTREG32(addr,val) 
+
+#if X_BYTE_ORDER == X_LITTLE_ENDIAN
+#define B_O16(x)  (x)
+#define B_O32(x)  (x)
+#else
+#define B_O16(x)  ((((x) & 0xff) << 8) | (((x) & 0xff) >> 8))
+#define B_O32(x)  ((((x) & 0xff) << 24) | (((x) & 0xff00) << 8) \
+                  | (((x) & 0xff0000) >> 8) | (((x) & 0xff000000) >> 24))
+#endif
+#define L_ADD(x)  (B_O32(x) & 0xffff) + ((B_O32(x) >> 12) & 0xffff00)
+
+#define SAVAGEIOMAPSIZE	0x80000
 
 #define SAVAGE_CRT_ON	1
 #define SAVAGE_LCD_ON	2
@@ -70,6 +110,47 @@ typedef struct {
     unsigned int  MMPR0, MMPR1, MMPR2, MMPR3;
 } SavageRegRec, *SavageRegPtr;
 
+/*  Tiling defines */
+#define TILE_SIZE_BYTE     2048   /* 0x800, 2K */
+
+#define TILEHEIGHT_16BPP        16
+#define TILEHEIGHT_32BPP        16
+#define TILEHEIGHT              16      /* all 16 and 32bpp tiles are 16 lines high */
+
+#define TILEWIDTH_BYTES         128     /* 2048/TILEHEIGHT (** not for use w/8bpp tiling) */
+#define TILEWIDTH8BPP_BYTES     64      /* 2048/TILEHEIGHT_8BPP */
+#define TILEWIDTH_16BPP         64      /* TILEWIDTH_BYTES/2-BYTES-PER-PIXEL */
+#define TILEWIDTH_32BPP         32      /* TILEWIDTH_BYTES/4-BYTES-PER-PIXEL */
+
+/* Bitmap descriptor structures for BCI */
+typedef struct _HIGH {
+    ushort Stride;
+    uchar Bpp;
+    uchar ResBWTile;
+} HIGH;
+
+typedef struct _BMPDESC1 {
+    ulong Offset;
+    HIGH  HighPart;
+} BMPDESC1;
+
+typedef struct _BMPDESC2 {
+    ulong LoPart;
+    ulong HiPart;
+} BMPDESC2;
+
+typedef union _BMPDESC {
+    BMPDESC1 bd1;
+    BMPDESC2 bd2;
+} BMPDESC;
+
+typedef struct _StatInfo {
+    int     origMode;
+    int     pageCnt;    
+    pointer statBuf;
+    int     realSeg;    
+    int     realOff;
+} StatInfoRec,*StatInfoPtr;
 
 typedef struct _Savage {
     SavageRegRec	SavedReg;
@@ -81,15 +162,20 @@ typedef struct _Savage {
     int			Bpp, Bpl, ScissB;
     unsigned		PlaneMask;
     I2CBusPtr		I2C;
+    I2CBusPtr		DVI;
+    unsigned char       DDCPort;
+    unsigned char       I2CPort;
 
     int			videoRambytes;
     int			videoRamKbytes;
     int			MemOffScreen;
+    int                 endfb;
     CARD32		CursorKByte;
 
     /* These are physical addresses. */
     unsigned long	FrameBufferBase;
     unsigned long	MmioBase;
+    unsigned long	ApertureBase;
     unsigned long	ShadowPhysical;
 
     /* These are linear addresses. */
@@ -97,6 +183,7 @@ typedef struct _Savage {
     unsigned char*	BciMem;
     unsigned char*	MapBaseDense;
     unsigned char*	FBBase;
+    unsigned char*	ApertureMap;
     unsigned char*	FBStart;
     CARD32 volatile *	ShadowVirtual;
 
@@ -118,7 +205,6 @@ typedef struct _Savage {
     Bool		fifo_moderate;
     Bool		fifo_aggressive;
     Bool		hwcursor;
-    Bool		hwc_on;
     Bool		NoAccel;
     Bool		shadowFB;
     Bool		UseBIOS;
@@ -132,6 +218,7 @@ typedef struct _Savage {
     int			iDevInfo;
     int			iDevInfoPrim;
 
+    Bool		FPExpansion;
     int			PanelX;		/* panel width */
     int			PanelY;		/* panel height */
     int			iResX;		/* crtc X display */
@@ -203,6 +290,64 @@ typedef struct _Savage {
     int			dwBCIWait2DIdle;
     XF86OffscreenImagePtr offscreenImages;
 
+#ifdef XF86DRI
+    int 		LockHeld;
+    Bool 		directRenderingEnabled;
+    DRIInfoPtr 		pDRIInfo;
+    int 		drmFD;
+    int 		numVisualConfigs;
+    __GLXvisualConfig*	pVisualConfigs;
+    SAVAGEConfigPrivPtr 	pVisualConfigsPriv;
+    SAVAGEDRIServerPrivatePtr DRIServerInfo;
+
+
+#if 0
+    Bool		haveQuiescense;
+    void		(*GetQuiescence)(ScrnInfoPtr pScrn);
+#endif
+
+    int 		agpMode;
+    drmSize		agpSize;
+    FBLinearPtr		reserved;
+    
+    unsigned int surfaceAllocation[7];
+    unsigned int xvmcContext;
+    unsigned int DRIrunning;
+    unsigned int hwmcOffset;
+    unsigned int hwmcSize;
+
+#endif
+
+    Bool bDisableXvMC;
+    Bool disableCOB;
+    Bool BCIforXv;
+
+    /* Bitmap Descriptors for BCI */
+    BMPDESC GlobalBD;
+    BMPDESC PrimaryBD;
+    BMPDESC SecondBD;
+    /* do we disable tile mode by option? */
+    Bool bDisableTile;
+    /* if we enable tile,we only support tile under 16/32bpp */
+    Bool bTiled;
+    int  lDelta;
+    int  ulAperturePitch; /* aperture pitch */
+
+    int  l3DDelta; 
+    int  ul3DAperturePitch; /* pitch for 3D */
+    /*
+     * cxMemory is number of pixels across screen width
+     * cyMemory is number of scanlines in available adapter memory.
+     *
+     * cxMemory * cyMemory is used to determine how much memory to
+     * allocate to our heap manager.  So make sure that any space at the
+     * end of video memory set aside at bInitializeHardware time is kept
+     * out of the cyMemory calculation.
+     */
+    int cxMemory,cyMemory;
+    
+    StatInfoRec     StatInfo; /* save the SVGA state */
+
 } SavageRec, *SavagePtr;
 
 /* Video flags. */
@@ -211,14 +356,40 @@ typedef struct _Savage {
 
 #define SAVPTR(p)	((SavagePtr)((p)->driverPrivate))
 
-/* Make the names of these externals driver-unique */
-#define gpScrn savagegpScrn
-#define myOUTREG savageOUTREG
-#define readdw savagereaddw
-#define readfb savagereadfb
-#define writedw savagewritedw
-#define writefb savagewritefb
-#define writescan savagewritescan
+/* add for support DRI */
+#ifdef XF86DRI
+
+#define SAVAGE_FRONT	0x1
+#define SAVAGE_BACK	0x2
+#define SAVAGE_DEPTH	0x4
+#define SAVAGE_STENCIL	0x8
+
+Bool SAVAGEDRIScreenInit( ScreenPtr pScreen );
+Bool SAVAGEInitMC(ScreenPtr pScreen);
+void SAVAGEDRICloseScreen( ScreenPtr pScreen );
+Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen );
+
+Bool SAVAGELockUpdate( ScrnInfoPtr pScrn, drmLockFlags flags );
+
+#if 0
+void SAVAGEGetQuiescence( ScrnInfoPtr pScrn );
+void SAVAGEGetQuiescenceShared( ScrnInfoPtr pScrn );
+#endif
+
+void SAVAGESelectBuffer(ScrnInfoPtr pScrn, int which);
+
+#if 0
+Bool SAVAGECleanupDma(ScrnInfoPtr pScrn);
+Bool SAVAGEInitDma(ScrnInfoPtr pScrn, int prim_size);
+#endif
+
+#define SAVAGE_AGP_1X_MODE		0x01
+#define SAVAGE_AGP_2X_MODE		0x02
+#define SAVAGE_AGP_4X_MODE		0x04
+#define SAVAGE_AGP_MODE_MASK	0x07
+
+#endif
+
 
 /* Prototypes. */
 
@@ -241,6 +412,7 @@ Bool SavageInitAccel(ScreenPtr);
 void SavageInitialize2DEngine(ScrnInfoPtr);
 void SavageSetGBD(ScrnInfoPtr);
 void SavageAccelSync(ScrnInfoPtr);
+/*int SavageHelpSolidROP(ScrnInfoPtr pScrn, int *fg, int pm, int *rop);*/
 
 /* In savage_i2c.c. */
 
@@ -259,6 +431,7 @@ void SavageRefreshArea32(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
 
 void SavageSetTextMode( SavagePtr psav );
 void SavageSetVESAMode( SavagePtr psav, int n, int Refresh );
+void SavageSetPanelEnabled( SavagePtr psav, Bool active );
 void SavageFreeBIOSModeTable( SavagePtr psav, SavageModeTablePtr* ppTable );
 SavageModeTablePtr SavageGetBIOSModeTable( SavagePtr psav, int iDepth );
 
@@ -266,7 +439,6 @@ unsigned short SavageGetBIOSModes(
     SavagePtr psav,
     int iDepth,
     SavageModeEntryPtr s3vModeTable );
-
 
 /* In savage_video.c */
 
