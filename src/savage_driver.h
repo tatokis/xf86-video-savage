@@ -232,7 +232,8 @@ typedef struct _Savage {
     Bool		UseBIOS;
     int			rotate;
     double		LCDClock;
-    Bool		ShadowStatus;
+    Bool		ConfigShadowStatus; /* from the config */
+    Bool		ShadowStatus;       /* automatically enabled with DRI */
     Bool		CrtOnly;
     Bool		TvOn;
     Bool		PAL;

@@ -50,6 +50,9 @@ static void SavageLeaveVT(int scrnIndex, int flags);
 static void SavageSave(ScrnInfoPtr pScrn);
 static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr, SavageRegPtr, Bool);
 
+static void SavageInitStatus(ScrnInfoPtr pScrn);
+static void SavageInitShadowStatus(ScrnInfoPtr pScrn);
+
 static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen, int argc,
 			     char **argv);
 static int SavageInternalScreenInit(int scrnIndex, ScreenPtr pScreen);
@@ -1223,7 +1226,9 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if( xf86GetOptValBool( psav->Options, OPTION_SHADOW_STATUS, &psav->ShadowStatus))
 	xf86DrvMsg( pScrn->scrnIndex, X_CONFIG,
 		    "Option: ShadowStatus enabled\n" );
-
+    /* If ShadowStatus is off it will be automatically enabled for DRI.
+     * If DRI initialization fails fall back to ConfigShadowStatus. */
+    psav->ConfigShadowStatus = psav->ShadowStatus;
 
     if( xf86GetOptValBool( psav->Options, OPTION_CRT_ONLY, &psav->CrtOnly))
 	xf86DrvMsg( pScrn->scrnIndex, X_CONFIG,
@@ -1756,37 +1761,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     usleep(10000);
 
     /* Set status word positions based on chip type. */
-
-    switch( psav->Chipset ) {
-	case S3_SAVAGE3D:
-	case S3_SAVAGE_MX:
-	    psav->WaitQueue	= WaitQueue3D;
-	    psav->WaitIdle	= WaitIdle3D;
-	    psav->WaitIdleEmpty	= WaitIdleEmpty3D;
-	    psav->bciUsedMask   = 0x1ffff;
-	    psav->eventStatusReg= 1;
-	    break;
-
-	case S3_SAVAGE4:
-	case S3_PROSAVAGE:
-	case S3_SUPERSAVAGE:
-	case S3_PROSAVAGEDDR:
-	case S3_TWISTER:
-	    psav->WaitQueue	= WaitQueue4;
-	    psav->WaitIdle	= WaitIdle4;
-	    psav->WaitIdleEmpty	= WaitIdleEmpty4;
-	    psav->bciUsedMask   = 0x1fffff;
-	    psav->eventStatusReg= 1;
-	    break;
-
-	case S3_SAVAGE2000:
-	    psav->WaitQueue	= WaitQueue2K;
-	    psav->WaitIdle	= WaitIdle2K;
-	    psav->WaitIdleEmpty	= WaitIdleEmpty2K;
-	    psav->bciUsedMask   = 0xfffff;
-	    psav->eventStatusReg= 2;
-	    break;
-    }
+    SavageInitStatus(pScrn);
 
     /* check for DVI/flat panel */
     dvi = FALSE;
@@ -2912,6 +2887,72 @@ static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 }
 #endif
 
+static void SavageInitStatus(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+
+    switch( psav->Chipset ) {
+	case S3_SAVAGE3D:
+	case S3_SAVAGE_MX:
+	    psav->WaitQueue	= WaitQueue3D;
+	    psav->WaitIdle	= WaitIdle3D;
+	    psav->WaitIdleEmpty	= WaitIdleEmpty3D;
+	    psav->bciUsedMask   = 0x1ffff;
+	    psav->eventStatusReg= 1;
+	    break;
+
+	case S3_SAVAGE4:
+	case S3_PROSAVAGE:
+	case S3_SUPERSAVAGE:
+	case S3_PROSAVAGEDDR:
+	case S3_TWISTER:
+	    psav->WaitQueue	= WaitQueue4;
+	    psav->WaitIdle	= WaitIdle4;
+	    psav->WaitIdleEmpty	= WaitIdleEmpty4;
+	    psav->bciUsedMask   = 0x1fffff;
+	    psav->eventStatusReg= 1;
+	    break;
+
+	case S3_SAVAGE2000:
+	    psav->WaitQueue	= WaitQueue2K;
+	    psav->WaitIdle	= WaitIdle2K;
+	    psav->WaitIdleEmpty	= WaitIdleEmpty2K;
+	    psav->bciUsedMask   = 0xfffff;
+	    psav->eventStatusReg= 2;
+	    break;
+    }
+}
+
+static void SavageInitShadowStatus(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+
+    psav->ShadowStatus = psav->ConfigShadowStatus;
+
+    SavageInitStatus(pScrn);
+
+    if( psav->ShadowStatus ) {
+	psav->ShadowPhysical = 
+	    psav->FrameBufferBase + psav->CursorKByte*1024 + 4096 - 32;
+	
+	psav->ShadowVirtual = (CARD32 *)
+	    (psav->FBBase + psav->CursorKByte*1024 + 4096 - 32);
+	
+	xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
+		    "Shadow area physical %08lx, linear %p\n",
+		    psav->ShadowPhysical, (void *)psav->ShadowVirtual );
+
+	psav->WaitQueue = ShadowWaitQueue;
+	psav->WaitIdle = ShadowWait;
+	psav->WaitIdleEmpty = ShadowWait;
+    }
+
+    if( psav->Chipset == S3_SAVAGE2000 )
+	psav->dwBCIWait2DIdle = 0xc0040000;
+    else
+	psav->dwBCIWait2DIdle = 0xc0020000;
+}
+
 static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 			     int argc, char **argv)
 {
@@ -2948,26 +2989,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 
     }
 
-    if( psav->ShadowStatus ) {
-	psav->ShadowPhysical = 
-	    psav->FrameBufferBase + psav->CursorKByte*1024 + 4096 - 32;
-	
-	psav->ShadowVirtual = (CARD32 *)
-	    (psav->FBBase + psav->CursorKByte*1024 + 4096 - 32);
-	
-	xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
-		    "Shadow area physical %08lx, linear %p\n",
-		    psav->ShadowPhysical, (void *)psav->ShadowVirtual );
-
-	psav->WaitQueue = ShadowWaitQueue;
-	psav->WaitIdle = ShadowWait;
-	psav->WaitIdleEmpty = ShadowWait;
-
-	if( psav->Chipset == S3_SAVAGE2000 )
-	    psav->dwBCIWait2DIdle = 0xc0040000;
-	else
-	    psav->dwBCIWait2DIdle = 0xc0020000;
-    }
+    SavageInitShadowStatus(pScrn);
     psav->ShadowCounter = 0;
 
     SavageSave(pScrn);
@@ -3003,6 +3025,18 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 	&& (SavageCheckAvailableRamFor3D(pScrn))) {
         /* Setup DRI after visuals have been established */
         psav->directRenderingEnabled = SAVAGEDRIScreenInit(pScreen);
+	/* If DRI init failed, reset shadow status. */
+	if (!psav->directRenderingEnabled) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Resetting ShadowStatus.\n");
+	    SavageInitShadowStatus(pScrn);
+	}
+	/* If shadow status was enabled for DRI, hook up the shadow
+	 * waiting functions now. */
+	else if (!psav->ConfigShadowStatus) {
+	    psav->WaitQueue = ShadowWaitQueue;
+	    psav->WaitIdle = ShadowWait;
+	    psav->WaitIdleEmpty = ShadowWait;
+	}
     } else
         psav->directRenderingEnabled = FALSE;
     
@@ -3175,6 +3209,13 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     if (psav->directRenderingEnabled) {
         /* complete the DRI setup.*/
         psav->directRenderingEnabled = SAVAGEDRIFinishScreenInit(pScreen);
+	/* If DRI initialization failed, reset shadow status and
+	 * reinitialize 2D engine. */
+	if (!psav->directRenderingEnabled) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Resetting ShadowStatus.\n");
+	    SavageInitShadowStatus(pScrn);
+	    SavageInitialize2DEngine(pScrn);
+	}
     }
     if (psav->directRenderingEnabled) {
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Direct rendering enabled\n");

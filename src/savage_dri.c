@@ -931,39 +931,40 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    
    }*/
 
-   if ( psav->ShadowStatus ) {
-      pSAVAGEDRIServer->status.size = 4096; /* 1 page */
-
-      if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
-		      DRM_CONSISTENT, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
-		      &pSAVAGEDRIServer->status.handle ) < 0 ) {
-	 xf86DrvMsg( pScreen->myNum, X_ERROR,
-		     "[drm] Could not add status page mapping\n" );
-	 return FALSE;
-      }
-      xf86DrvMsg( pScreen->myNum, X_INFO,
-		  "[drm] Status handle = 0x%08lx\n",
-		  pSAVAGEDRIServer->status.handle );
-
-      if ( drmMap( psav->drmFD,
-		   pSAVAGEDRIServer->status.handle,
-		   pSAVAGEDRIServer->status.size,
-		   &pSAVAGEDRIServer->status.map ) < 0 ) {
-	 xf86DrvMsg( pScreen->myNum, X_ERROR,
-		     "[drm] Could not map status page\n" );
-	 return FALSE;
-      }
-      xf86DrvMsg( pScreen->myNum, X_INFO,
-		  "[drm] Status page mapped at 0x%08lx\n",
-		  (unsigned long)pSAVAGEDRIServer->status.map );
-
-      psav->ShadowPhysical = pSAVAGEDRIServer->status.handle;
-      psav->ShadowVirtual = pSAVAGEDRIServer->status.map;
-   } else {
-      pSAVAGEDRIServer->status.size = 0;
-      pSAVAGEDRIServer->status.handle = 0;
-      pSAVAGEDRIServer->status.map = NULL;
+   /* Always enable ShadowStatus for direct rendering. */
+   if ( !psav->ShadowStatus ) {
+       psav->ShadowStatus = 1;
+       xf86DrvMsg( pScreen->myNum, X_INFO,
+		   "[drm] Enabling ShadowStatus for DRI.\n" );
    }
+
+   pSAVAGEDRIServer->status.size = 4096; /* 1 page */
+
+   if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
+		   DRM_CONSISTENT, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
+		   &pSAVAGEDRIServer->status.handle ) < 0 ) {
+       xf86DrvMsg( pScreen->myNum, X_ERROR,
+		   "[drm] Could not add status page mapping\n" );
+       return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[drm] Status handle = 0x%08lx\n",
+	       pSAVAGEDRIServer->status.handle );
+
+   if ( drmMap( psav->drmFD,
+		pSAVAGEDRIServer->status.handle,
+		pSAVAGEDRIServer->status.size,
+		&pSAVAGEDRIServer->status.map ) < 0 ) {
+       xf86DrvMsg( pScreen->myNum, X_ERROR,
+		   "[drm] Could not map status page\n" );
+       return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[drm] Status page mapped at 0x%08lx\n",
+	       (unsigned long)pSAVAGEDRIServer->status.map );
+
+   psav->ShadowPhysical = pSAVAGEDRIServer->status.handle;
+   psav->ShadowVirtual = pSAVAGEDRIServer->status.map;
 
    return TRUE;
 }
@@ -1597,7 +1598,9 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
 
    DRICloseScreen( pScreen );
    
-   /*Don't use shadow status any more*/
+   /* Don't use shadow status any more. If this happens due to failed
+    * DRI initialization then SavageScreenInit will do the real
+    * cleanup and restore ShadowStatus to sane settings. */
    psav->ShadowVirtual = NULL;
    psav->ShadowPhysical = 0;
 
