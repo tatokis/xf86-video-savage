@@ -36,14 +36,6 @@
 #include "xf86Pci.h"
 #include "xf86fbman.h"
 
-#if 0
-#define PSZ 8
-#include "cfb.h"
-#undef PSZ
-#include "cfb16.h"
-#include "cfb32.h"
-#endif
-
 #include "miline.h"
 
 
