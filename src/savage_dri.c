@@ -1239,6 +1239,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
    int i;
    unsigned int TileStride;
+   unsigned int zTileStride;
    
    
    if ( !psav->pDRIInfo )
@@ -1296,24 +1297,30 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    pSAVAGEDRI->frontPitch		= pSAVAGEDRIServer->frontPitch;
    pSAVAGEDRI->IsfrontTiled             = psav->bTiled; /* AGD: was 0 */
    
+   if(pSAVAGEDRI->cpp==2)
+       TileStride = (pSAVAGEDRI->width+63)&(~63);
+   else
+       TileStride = (pSAVAGEDRI->width+31)&(~31);
+
+   if(pSAVAGEDRI->zpp==2)
+       zTileStride = (pSAVAGEDRI->width+63)&(~63);
+   else
+       zTileStride = (pSAVAGEDRI->width+31)&(~31);
+
    if(pSAVAGEDRI->IsfrontTiled)
    {
-      if(pSAVAGEDRI->cpp==2)
-        TileStride = (pSAVAGEDRI->width+63)&(~63);
-      else
-        TileStride = (pSAVAGEDRI->width+31)&(~31);
-
       if ((psav->Chipset == S3_TWISTER)
          || (psav->Chipset == S3_PROSAVAGE)
          || (psav->Chipset == S3_PROSAVAGEDDR)
          || (psav->Chipset == S3_SUPERSAVAGE))
       { 
-      		pSAVAGEDRI->frontBitmapDesc   	= 0x10000000 | /* block write disabled */
+      		pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
                 	                          (1<<24) | /* destination tile format */
                         	                  (pScrn->bitsPerPixel<<16) | /* bpp */
                         	                  TileStride; /* stride */
+                pSAVAGEDRI->frontPitch          = TileStride;
       } else {        
-      		pSAVAGEDRI->frontBitmapDesc   	= 0x10000000 | /* block write disabled */
+      		pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
                 	                          ((pSAVAGEDRI->cpp==2)?
                         	                     BCI_BD_TILE_16:BCI_BD_TILE_32) | /*16/32 bpp tile format */
                         	                  (pScrn->bitsPerPixel<<16) | /* bpp */
@@ -1323,40 +1330,44 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    }
    else
    {
-      pSAVAGEDRI->frontBitmapDesc	= 0x10000000 | /* AGD: block write should be disabled:  was 0x00000000 */
+      pSAVAGEDRI->frontBitmapDesc	= BCI_BD_BW_DISABLE | /* AGD: block write should be disabled:  was 0x00000000 */
       					  pScrn->bitsPerPixel<<16 |
       					  pSAVAGEDRI->width;
    }
    
+   {
+      if ((psav->Chipset == S3_TWISTER)
+         || (psav->Chipset == S3_PROSAVAGE)
+         || (psav->Chipset == S3_PROSAVAGEDDR)
+         || (psav->Chipset == S3_SUPERSAVAGE))
+      {
+      		pSAVAGEDRI->backBitmapDesc   	= BCI_BD_BW_DISABLE |
+                	                          (1<<24) |
+                	                          (pScrn->bitsPerPixel<<16) |
+                	                          TileStride;
+      		pSAVAGEDRI->depthBitmapDesc   	= BCI_BD_BW_DISABLE |
+ 	     					  (1<<24) |
+	                                          (pScrn->bitsPerPixel<<16) |
+	                                          zTileStride;
+      } else {
+      		pSAVAGEDRI->backBitmapDesc   	= BCI_BD_BW_DISABLE |
+                	                          ((pSAVAGEDRI->cpp==2)?
+                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
+                	                          (pScrn->bitsPerPixel<<16) |
+                	                          TileStride;
+	        pSAVAGEDRI->depthBitmapDesc   	= BCI_BD_BW_DISABLE |
+                	                          ((pSAVAGEDRI->zpp==2)?
+                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
+                	                          (pScrn->bitsPerPixel<<16) |
+                	                          zTileStride;
+      }
+   }
+
    pSAVAGEDRI->backOffset		= pSAVAGEDRIServer->backOffset;
    pSAVAGEDRI->backbufferSize		= pSAVAGEDRIServer->backbufferSize;
    pSAVAGEDRI->backbuffer		= psav->FrameBufferBase +
    					  pSAVAGEDRI->backOffset;
    pSAVAGEDRI->backPitch		= pSAVAGEDRIServer->backPitch;
-
-   {
-      if(pSAVAGEDRI->cpp==2)
-        TileStride = (pSAVAGEDRI->width+63)&(~63);
-      else
-        TileStride = (pSAVAGEDRI->width+31)&(~31);
-
-      if ((psav->Chipset == S3_TWISTER)
-         || (psav->Chipset == S3_PROSAVAGE)
-         || (psav->Chipset == S3_PROSAVAGEDDR)
-         || (psav->Chipset == S3_SUPERSAVAGE)) /* AGD: supersavage may work like savage4/MX/IX, I just don't know. */
-      {        				       /* It's here since the 2D driver sets it up like prosavage */
-      		pSAVAGEDRI->backBitmapDesc   	= 0x10000000 |
-                	                          (1<<24) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          TileStride;
-      } else {
-      		pSAVAGEDRI->backBitmapDesc   	= 0x10000000 |
-                	                          ((pSAVAGEDRI->cpp==2)?
-                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          TileStride;
-      }
-   }
 
    pSAVAGEDRI->depthOffset		= pSAVAGEDRIServer->depthOffset;
    pSAVAGEDRI->depthbufferSize		= pSAVAGEDRIServer->depthbufferSize;
@@ -1364,29 +1375,6 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    					  pSAVAGEDRI->depthOffset;
    pSAVAGEDRI->depthPitch		= pSAVAGEDRIServer->depthPitch;
 
-   {
-      if(pSAVAGEDRI->zpp==2)
-        TileStride = (pSAVAGEDRI->width+63)&(~63);
-      else
-        TileStride = (pSAVAGEDRI->width+31)&(~31);
-
-      if ((psav->Chipset == S3_TWISTER)
-         || (psav->Chipset == S3_PROSAVAGE)
-         || (psav->Chipset == S3_PROSAVAGEDDR)
-         || (psav->Chipset == S3_SUPERSAVAGE))
-      {  
-      		pSAVAGEDRI->depthBitmapDesc   	= 0x10000000 |
- 	     					  (1<<24) |
-	                                          (pScrn->bitsPerPixel<<16) |
-	                                          TileStride;
-      } else {
-	        pSAVAGEDRI->depthBitmapDesc   	= 0x10000000 |
-                	                          ((pSAVAGEDRI->zpp==2)?
-                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          TileStride;
-      }
-   }
 
    pSAVAGEDRI->textureOffset	= pSAVAGEDRIServer->textureOffset;
    pSAVAGEDRI->textures 		= psav->FrameBufferBase +
@@ -1439,16 +1427,16 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 	|| (psav->Chipset == S3_SAVAGE3D)) {
       	    if(pSAVAGEDRI->cpp == 2)
       	    {
-         	value |=  ((psav->l3DDelta / 4) >> 5) << 24; /* I assume psav->l3DDelta for 3D */
+         	value |=  ((psav->l3DDelta / 4) >> 5) << 24;
          	value |= 2<<30;
       	    } else {
-         	value |=  ((psav->l3DDelta / 4) >> 5) << 24; /* I assume psav->l3DDelta for 3D */
+         	value |=  ((psav->l3DDelta / 4) >> 5) << 24;
          	value |= 3<<30;
       	    }
 
-	    OUTREG(0x48C40, value|(pSAVAGEDRI->frontOffset) ); /* front */ 
-	    OUTREG(0x48C44, value|(pSAVAGEDRI->backOffset) ); /* back  */
-	    OUTREG(0x48C48, value|(pSAVAGEDRI->depthOffset) ); /* depth */
+	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset) ); /* front */ 
+	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset) ); /* back  */
+	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset) ); /* depth */
       } else {
       	    if(pSAVAGEDRI->cpp == 2)
       	    {
@@ -1459,9 +1447,9 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
          	value |= 3<<30;
       	    }
 
-	    OUTREG(0x48C40, value|(pSAVAGEDRI->frontOffset >> 5) ); /* front */
-	    OUTREG(0x48C44, value|(pSAVAGEDRI->backOffset >> 5) ); /* back  */
-	    OUTREG(0x48C48, value|(pSAVAGEDRI->depthOffset >> 5) ); /* depth */
+	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> 5) ); /* front */
+	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset >> 5) ); /* back  */
+	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset >> 5) ); /* depth */
       }
    }
    

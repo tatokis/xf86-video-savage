@@ -478,8 +478,8 @@ void SavageSetGBD_Twister(ScrnInfoPtr pScrn)
 
     if (psav->Chipset == S3_SAVAGE4) {
 	bci_enable = BCI_ENABLE;
-	tile16 = TILE_FORMAT_DESTINATION16;
-	tile32 = TILE_FORMAT_DESTINATION32;
+	tile16 = TILE_FORMAT_16BPP;
+	tile32 = TILE_FORMAT_32BPP;
     } else {
 	bci_enable = BCI_ENABLE_TWISTER;
 	tile16 = TILE_DESTINATION;
@@ -645,8 +645,8 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
     int bci_enable, tile16, tile32;
 
     bci_enable = BCI_ENABLE;
-    tile16 = TILE_FORMAT_DESTINATION16;
-    tile32 = TILE_FORMAT_DESTINATION32;
+    tile16 = TILE_FORMAT_16BPP;
+    tile32 = TILE_FORMAT_32BPP;
 
 
     /* following is the enable case */
@@ -675,14 +675,6 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
     OUTREG8(CRT_DATA_REG,byte);
              
     OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
-
-    /*
-     * load ps1 active registers as determined by MM81C0/81C4
-     * load ps2 active registers as determined by MM81B0/81B4
-     */
-    OUTREG8(CRT_ADDRESS_REG,0x65); 
-    byte =  INREG8(CRT_DATA_REG) | 0x03;
-    OUTREG8(CRT_DATA_REG,byte);
 
 #if 0
     /* Set primary stream to bank 0 */

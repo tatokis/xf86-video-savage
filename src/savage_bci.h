@@ -19,14 +19,13 @@
 #define   TILE_FORMAT_LINEAR            0
 #define   TILE_TEXTURE                  2
 #define   TILE_DESTINATION              1
-#define   TILE_FORMAT_DESTINATION16     2
-#define   TILE_FORMAT_DESTINATION32     3
+#define   TILE_FORMAT_16BPP     	2
+#define   TILE_FORMAT_32BPP     	3
 
 /* BD - BCI enable */
 /* savage4, MX, IX, 3D */
 #define   BCI_ENABLE                    8
-/* twister, prosavage */
-/* not sure which one supersavage fits into */
+/* twister, prosavage, DDR, supersavage, 2000 */
 #define   BCI_ENABLE_TWISTER            0
 
 #define   S3_BIG_ENDIAN                    4
