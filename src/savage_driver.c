@@ -1899,7 +1899,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
         psav->LockHeld = 0;
     }
 #endif
-    if (!psav->IsSecondary)
+    if (!SAVPTR(pScrn)->IsSecondary)
     	SavageSave(pScrn);
     if(SavageModeInit(pScrn, pScrn->currentMode)) {
 	/* some BIOSes seem to enable HW cursor on PM resume */
