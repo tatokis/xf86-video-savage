@@ -743,13 +743,14 @@ void SavageSetGBD_3D(ScrnInfoPtr pScrn)
     OUTREG32(ADVANCED_FUNC_CTRL,ulTmp);
 
     /*
-     * Set up Tiled Surface Registers
-     *  Bit 25:20 - Surface width in tiles.
-     *  Bit 29 - Y Range Flag.
-     *  Bit 31:30 = 00, 4 bpp.
-     *            = 01, 8 bpp.
-     *            = 10, 16 bpp.
-     *            = 11, 32 bpp.
+     * Tiled Surface 0 Registers MM48C40:
+     *  bit 0~23: tile surface 0 frame buffer offset
+     *  bit 24~29:tile surface 0 width
+     *  bit 30~31:tile surface 0 bits/pixel
+     *            00: reserved
+     *            01, 8 bits
+     *            10, 16 Bits.
+     *            11, 32 Bits.
      */
     /*
      * Global Bitmap Descriptor Register MM816C
