@@ -51,6 +51,7 @@
 #include "savage_regs.h"
 #include "savage_driver.h"
 #include "savage_bci.h"
+#include "savage_streams.h"
 
 #define _XF86DRI_SERVER_
 #include "GL/glxtokens.h"

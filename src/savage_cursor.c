@@ -24,7 +24,9 @@ static void SavageSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
 #define outCRReg(reg, val) (VGAHWPTR(pScrn))->writeCrtc( VGAHWPTR(pScrn), reg, val )
 #define inSRReg(reg) (VGAHWPTR(pScrn))->readSeq( VGAHWPTR(pScrn), reg )
 #define outSRReg(reg, val) (VGAHWPTR(pScrn))->writeSeq( VGAHWPTR(pScrn), reg, val )
+#if 0
 #define inStatus1() (VGAHWPTR(pScrn))->readST01( VGAHWPTR(pScrn) )
+#endif
 
 /* 
  * certain HW cursor operations seem 
@@ -104,12 +106,14 @@ SavageHWCursorInit(ScreenPtr pScreen)
     infoPtr->LoadCursorImage = SavageLoadCursorImage;
     infoPtr->HideCursor = SavageHideCursor;
     infoPtr->ShowCursor = SavageShowCursor;
-
+    infoPtr->UseHWCursor = NULL;
+#if 0 /*AGD:  HW cursor seems to work fine even with expansion... */
     if ((S3_SAVAGE_MOBILE_SERIES(psav->Chipset)
-	 || (psav->Chipset == S3_PROSAVAGE)) && !psav->CrtOnly)
+	 || (S3_MOBILE_TWISTER_SERIES(psav->Chipset))) && !psav->CrtOnly)
 	infoPtr->UseHWCursor = SavageUseHWCursor;
     else
 	infoPtr->UseHWCursor = NULL;
+#endif
     if( !psav->CursorKByte )
 	psav->CursorKByte = pScrn->videoRam - 4;
 
@@ -121,7 +125,7 @@ SavageHWCursorInit(ScreenPtr pScreen)
 void
 SavageShowCursor(ScrnInfoPtr pScrn)
 {
-    /* Turn cursor on. */
+   /* Turn cursor on. */
    outCRReg( 0x45, inCRReg(0x45) | 0x01 );
    SAVPTR(pScrn)->hwc_on = TRUE;
 }
@@ -131,6 +135,7 @@ void
 SavageHideCursor(ScrnInfoPtr pScrn)
 {
     /* Turn cursor off. */
+
     if( S3_SAVAGE4_SERIES( SAVPTR(pScrn)->Chipset ) )
     {
        waitHSync(5);

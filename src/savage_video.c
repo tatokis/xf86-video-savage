@@ -4,10 +4,11 @@
 #include "dix.h"
 #include "dixstruct.h"
 #include "fourcc.h"
-#include "xaalocal.h"
 
 #include "savage_driver.h"
 #include "savage_streams.h"
+#include "savage_regs.h"
+#include "savage_bci.h"
 
 #define OFF_DELAY 	200  /* milliseconds */
 #define FREE_DELAY 	60000
@@ -226,7 +227,6 @@ void savageOUTREG( SavagePtr psav, unsigned long offset, unsigned long value )
     ErrorF( " now %08lx\n", (CARD32)MMIO_IN32( psav->MapBase, offset ) );
 }
 
-
 static void
 SavageClipVWindow(ScrnInfoPtr pScrn)
 {
@@ -254,7 +254,6 @@ void SavageInitVideo(ScreenPtr pScreen)
     xf86ErrorFVerb(XVTRACE,"SavageInitVideo\n");
     if(
 	S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-        (psav->Chipset == S3_SUPERSAVAGE) ||
 	(psav->Chipset == S3_SAVAGE2000)
     )
     {
@@ -583,10 +582,10 @@ SavageSetupImageVideo(ScreenPtr pScreen)
 
     psav->adaptor = adapt;
 
-#if 0
+    #if 0
     psav->BlockHandler = pScreen->BlockHandler;
     pScreen->BlockHandler = SavageBlockHandler;
-#endif
+    #endif
 
     return adapt;
 }
@@ -790,6 +789,89 @@ SavageQueryBestSize(
     if(*p_w > 16384) *p_w = 16384;
 }
 
+/* SavageCopyPlanarDataBCI() causes artifacts on the screen when used on savage4. 
+ * It's probably something with the BCI.  Maybe we need a waitforidle() or
+ * something...
+ */
+static void
+SavageCopyPlanarDataBCI(
+    ScrnInfoPtr pScrn,
+    unsigned char *srcY, /* Y */
+    unsigned char *srcV, /* V */
+    unsigned char *srcU, /* U */
+    unsigned char *dst,
+    int srcPitch, int srcPitch2,
+    int dstPitch,
+    int h,int w)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+    /* half of the dest buffer for copying the YVU data to it ??? */
+    unsigned char *dstCopy = (unsigned char *)(((unsigned long)dst
+                                                + 2 * srcPitch * h
+                                                + 0x0f) & ~0x0f);
+    /* for pixel transfer */
+    unsigned long offsetY = (unsigned long)dstCopy - (unsigned long)psav->FBBase;
+    unsigned long offsetV = offsetY +  srcPitch * h;
+    unsigned long offsetU = offsetV +  srcPitch2 * (h>>1);
+    unsigned long dstOffset  = (unsigned long)dst - (unsigned long)psav->FBBase;
+    int i;
+    
+    BCI_GET_PTR;
+
+    /* copy Y planar */
+    for (i=0;i<srcPitch * h;i++) {
+        dstCopy[i] = srcY[i];
+    }
+
+    /* copy V planar */    
+    dstCopy = dstCopy + srcPitch * h;
+    for (i=0;i<srcPitch2 * (h>>1);i++) {
+        dstCopy[i] = srcV[i];
+    }
+
+    /* copy U planar */
+    dstCopy = dstCopy + srcPitch2 * (h>>1);    
+    for (i=0;i<srcPitch2 * (h>>1);i++) {
+        dstCopy[i] = srcU[i];        
+    }
+
+    /*
+     * Transfer pixel data from one memory location to another location
+     * and reformat the data during the transfer
+     * a. program BCI51 to specify the source information
+     * b. program BCI52 to specify the destination information
+     * c. program BCI53 to specify the source dimensions 
+     * d. program BCI54 to specify the destination dimensions
+     * e. (if the data is in YCbCr420 format)program BCI55,BCI56,BCI57 to
+     *    locations of the Y,Cb,and Cr data
+     * f. program BCI50(command=011) to specify the formatting options and
+     *    kick off the transfer
+     * this command can be used for color space conversion(YCbCr to RGB)
+     * or for oversampling, but not for both simultaneously. it can also be
+     * used to do mastered image transfer when the source is tiled
+     */
+
+    w = (w+0xf)&0xff0;
+    psav->WaitQueue(psav,11);
+    BCI_SEND(0x96070051);
+    BCI_SEND(offsetY);
+
+    BCI_SEND(dstOffset);
+
+    BCI_SEND(((h-1)<<16)|((w-1)>>3));
+
+    BCI_SEND(dstPitch >> 3);
+
+
+    BCI_SEND(offsetU);
+    BCI_SEND(offsetV);
+
+    BCI_SEND((srcPitch2 << 16)| srcPitch2);
+
+    BCI_SEND(0x96010050);
+    BCI_SEND(0x00200003 | srcPitch);
+    BCI_SEND(0xC0170000);
+}
 
 static void
 SavageCopyData(
@@ -922,6 +1004,7 @@ SavageDisplayVideoOld(
     /*DisplayModePtr mode = pScrn->currentMode;*/
     int vgaCRIndex, vgaCRReg, vgaIOBase;
     CARD32 ssControl;
+    int scalratio;
 
 
     vgaIOBase = hwp->IOBase;
@@ -931,6 +1014,18 @@ SavageDisplayVideoOld(
     if ( psav->videoFourCC != id ) {
 	SavageSetBlend(pScrn,id);
 	SavageResetVideo(pScrn);
+    }
+
+    /* Calculate horizontal scale factor. */
+    if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
+        && psav->FPExpansion) {
+        drw_w = (((float)(drw_w * psav->XExp1)/(float)psav->XExp2)+1);
+        drw_h = (float)(drw_h * psav->YExp1)/(float)psav->YExp2+1;
+        dstBox->x1 = (float)(dstBox->x1 * psav->XExp1)/(float)psav->XExp2;
+        dstBox->y1 = (float)(dstBox->y1 * psav->YExp1)/(float)psav->YExp2;
+
+        dstBox->x1 += psav->displayXoffset;
+        dstBox->y1 += psav->displayYoffset;
     }
 
     /* Set surface format. */
@@ -944,9 +1039,16 @@ SavageDisplayVideoOld(
 
     /* Calculate vertical scale factor. */
 
-    OUTREG(SSTREAM_LINES_REG, src_h );
+    /*
+     * MM81E8:Secondary Stream Source Line Count
+     *   bit_0~10: # of lines in the source image (before scaling)
+     *   bit_15 = 1: Enable vertical interpolation
+     *            0: Line duplicaion
+     */
+    OUTREG(SSTREAM_LINES_REG, 0x00008000 | src_h );
     OUTREG(SSTREAM_VINITIAL_REG, 0 );
-    OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );
+    /*OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );*/
+    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));
 
     /* Set surface location and stride. */
 
@@ -957,23 +1059,52 @@ SavageDisplayVideoOld(
     OUTREG(SSTREAM_WINDOW_SIZE_REG, OS_WH(dstBox->x2-dstBox->x1,
 					  dstBox->y2-dstBox->y1));
 
+    /*
+     * Process horizontal scaling
+     *  upscaling and downscaling smaller than 2:1 controled by MM8198
+     *  MM8190 controls downscaling mode larger than 2:1
+     */
+    scalratio = 0;
+    ssControl = 0;
+#if 0
     if( src_w > (drw_w << 1) )
     {
+	/* BUGBUG shouldn't this be >=?  */
 	if( src_w <= (drw_w << 2) )
 	    ssControl |= HDSCALE_4;
-	else if( src_w <= (drw_w << 3) )
+	else if( src_w > (drw_w << 3) )
 	    ssControl |= HDSCALE_8;
-	else if( src_w <= (drw_w << 4) )
+	else if( src_w > (drw_w << 4) )
 	    ssControl |= HDSCALE_16;
-	else if( src_w <= (drw_w << 5) )
+	else if( src_w > (drw_w << 5) )
 	    ssControl |= HDSCALE_32;
-	else if( src_w <= (drw_w << 6) )
+	else if( src_w > (drw_w << 6) )
 	    ssControl |= HDSCALE_64;
     }
+#endif
+    if (src_w >= (drw_w * 2)) {
+        if (src_w < (drw_w * 4)) {
+            scalratio = HSCALING(2,1);
+        } else if (src_w < (drw_w * 8)) {
+            ssControl |= HDSCALE_4;
+        } else if (src_w < (drw_w * 16)) {
+            ssControl |= HDSCALE_8;
+        } else if (src_w < (drw_w * 32)) {
+            ssControl |= HDSCALE_16;
+        }  else if (src_w < (drw_w * 64)) {
+            ssControl |= HDSCALE_32;
+        } else
+            ssControl |= HDSCALE_64;
+    } else
+        scalratio = HSCALING(src_w,drw_w);
 
     ssControl |= src_w;
     ssControl |= (1 << 24);
+    /* Wait for VBLANK. */
+    VerticalRetraceWait();
     OUTREG(SSTREAM_CONTROL_REG, ssControl);
+    if (scalratio)
+        OUTREG(SSTREAM_STRETCH_REG,scalratio);
 
 #if 0
     /* Set color key on primary. */
@@ -1196,13 +1327,23 @@ SavagePutImage(
 	top &= ~1;
 	tmp = ((top >> 1) * srcPitch2) + (left >> 2);
 	offsetU += tmp;
-	offsetV += tmp; 
+	offsetV += tmp;
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
-	SavageCopyPlanarData(
-	    buf + (top * srcPitch) + (left >> 1), 
-	    buf + offsetV, 
-	    buf + offsetU, 
-	    dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
+        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv 
+	    /*&& (!psav->disableCOB)*/) {
+            SavageCopyPlanarDataBCI(
+                pScrn,
+	    	buf + (top * srcPitch) + (left >> 1), 
+	    	buf + offsetV, 
+	    	buf + offsetU, 
+	    	dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
+        } else {
+	    SavageCopyPlanarData(
+	    	buf + (top * srcPitch) + (left >> 1), 
+	    	buf + offsetV, 
+	    	buf + offsetU, 
+	    	dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
+        }
 	break;
     case FOURCC_Y211:		/* Y211 */
     case FOURCC_RV15:		/* RGB15 */
@@ -1226,6 +1367,7 @@ SavagePutImage(
 	REGION_COPY(pScreen, &pPriv->clip, clipBoxes);
 	/* draw these */
 	xf86XVFillKeyHelper(pScrn->pScreen, pPriv->colorKey, clipBoxes);
+
     }
 
     pPriv->videoStatus = CLIENT_VIDEO_ON;
@@ -1249,6 +1391,10 @@ SavageQueryImageAttributes(
     if(offsets) offsets[0] = 0;
 
     switch(id) {
+    case FOURCC_IA44:
+        if (pitches) pitches[0]=*w;
+        size=(*w)*(*h);
+        break;
     case FOURCC_Y211:
 	size = *w << 2;
 	if(pitches) pitches[0] = size;
@@ -1280,7 +1426,6 @@ SavageQueryImageAttributes(
 
     return size;
 }
-
 
 /****************** Offscreen stuff ***************/
 
@@ -1483,3 +1628,4 @@ SavageInitOffscreenImages(ScreenPtr pScreen)
     
     xf86XVRegisterOffscreenImages(pScreen, offscreenImages, 1);
 }
+

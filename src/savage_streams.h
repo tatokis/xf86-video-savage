@@ -10,9 +10,9 @@
 
 /* New streams */
 
-/* CR67[2] = 1 : enable stream 1 */
+/* CR67[2] = 1 : enable secondary stream 1 */
 #define ENABLE_STREAM1              0x04
-/* CR67[1] = 1 : enable stream 2 */
+/* CR67[1] = 1 : enable secondary stream 2 */
 #define ENABLE_STREAM2              0x02
 /* mask to clear CR67[2,1] */
 #define NO_STREAMS                  0xF9
@@ -53,6 +53,8 @@
 #define PSTREAM_FBADDR1_REG		0x81C4
 #define PSTREAM_STRIDE_REG		0x81C8
 #define DOUBLE_BUFFER_REG		0x81CC
+/* updated by peterzhu,original define is DOUBLE_BUFFER_REG*/
+#define MULTIPLE_BUFFER_REG             0x81CC
 #define SSTREAM_FBADDR0_REG		0x81D0
 #define SSTREAM_FBADDR1_REG		0x81D4
 #define SSTREAM_STRIDE_REG		0x81D8
@@ -71,6 +73,32 @@
 
 #define OS_XY(x,y)	(((x+1)<<16)|(y+1))
 #define OS_WH(x,y)	(((x-1)<<16)|(y))
+
+/* Streams Processor macros */
+#define H_Shift                 0
+#define H_Mask                  (((1L << 11) - 1) << H_Shift)
+#define W_Shift                 16
+#define W_Mask                  (((1L << 11) - 1) << W_Shift)
+                                                                                                                    
+#define Y_Shift                 0
+#define Y_Mask                  (((1L << 11) - 1) << Y_Shift)
+#define X_Shift                 16
+#define X_Mask                  (((1L << 11) - 1) << X_Shift)
+                                                                                                                    
+#define XY(x,y)      ((((x+1)<<X_Shift)&X_Mask) | (((y+1)<<Y_Shift)&Y_Mask))
+#define WH(w,h)      ((((w-1)<<W_Shift)&W_Mask) | (((h)<<H_Shift)&H_Mask))
+
+#define HSCALING_Shift    0
+#define HSCALING_Mask     (((1L << 16)-1) << HSCALING_Shift)
+#define HSCALING(w0,w1)   ((((unsigned int)(((double)w0/(double)w1) * (1 << 15))) \
+                               << HSCALING_Shift) \
+                           & HSCALING_Mask)
+                                                                                                                    
+#define VSCALING_Shift    0
+#define VSCALING_Mask     (((1L << 20)-1) << VSCALING_Shift)
+#define VSCALING(h0,h1)   ((((unsigned int) (((double)h0/(double)h1) * (1 << 15))) \
+                               << VSCALING_Shift) \
+                           & VSCALING_Mask)
 
 /* New Streams Processor */
 /* Stream Processor 1 */

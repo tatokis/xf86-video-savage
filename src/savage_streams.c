@@ -10,8 +10,10 @@
 static void SavageInitStreamsOld(ScrnInfoPtr pScrn);
 static void SavageInitStreamsNew(ScrnInfoPtr pScrn);
 
+static void OverlayTwisterInit(ScrnInfoPtr pScrn);
 static void OverlayParamInit(ScrnInfoPtr pScrn);
 static void InitStreamsForExpansion(ScrnInfoPtr pScrn);
+static void PatchEnableSPofPanel(ScrnInfoPtr pScrn);
 
 static void
 SavageInitSecondaryStreamOld(ScrnInfoPtr pScrn)
@@ -108,7 +110,6 @@ SavageInitSecondaryStream(ScrnInfoPtr pScrn)
     SavagePtr psav = SAVPTR(pScrn);
 
     if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-	(psav->Chipset == S3_SUPERSAVAGE) ||
 	(psav->Chipset == S3_SAVAGE2000) )
 	SavageInitSecondaryStreamNew(pScrn);
     else 
@@ -118,7 +119,7 @@ SavageInitSecondaryStream(ScrnInfoPtr pScrn)
 void SavageInitStreamsOld(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    unsigned long jDelta;
+    /*unsigned long jDelta;*/
     unsigned long format = 0;
 
     /*
@@ -131,11 +132,33 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
 
     /* Primary stream reflects the frame buffer. */
 
+    if (!psav->bTiled) {
+        OUTREG(PSTREAM_STRIDE_REG,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000) |
+                 (psav->lDelta & 0x00001fff));
+    }
+    else if (pScrn->bitsPerPixel == 16) {
+        /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
+        OUTREG(PSTREAM_STRIDE_REG,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
+                 | 0x80000000 | (psav->lDelta & 0x00001fff));
+    }
+    else if (pScrn->bitsPerPixel == 32) {
+        OUTREG(PSTREAM_STRIDE_REG,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
+                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
+    }
+    OUTREG(PSTREAM_FBSIZE_REG, 
+		pScrn->virtualY * pScrn->virtualX * (pScrn->bitsPerPixel >> 3));
+
+
     if (psav->FBStart2nd) {
-	jDelta = pScrn->displayWidth;
+	unsigned long jDelta = pScrn->displayWidth;
 	format = 0 << 24;
+	OUTREG( PSTREAM_STRIDE_REG, jDelta );
+	OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );
     } else {
-	jDelta = pScrn->displayWidth * (pScrn->bitsPerPixel + 7) / 8;
+	/*jDelta = pScrn->displayWidth * (pScrn->bitsPerPixel + 7) / 8;*/
 	switch( pScrn->depth ) {
 	    case  8: format = 0 << 24; break;
 	    case 15: format = 3 << 24; break;
@@ -148,9 +171,9 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
     OUTREG( PSTREAM_WINDOW_SIZE_REG, OS_WH(pScrn->displayWidth, pScrn->virtualY) );
     OUTREG( PSTREAM_FBADDR0_REG, pScrn->fbOffset );
     OUTREG( PSTREAM_FBADDR1_REG, 0 );
-    OUTREG( PSTREAM_STRIDE_REG, jDelta );
+    /*OUTREG( PSTREAM_STRIDE_REG, jDelta );*/
     OUTREG( PSTREAM_CONTROL_REG, format );
-    OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );
+    /*OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );*/
 
     OUTREG( COL_CHROMA_KEY_CONTROL_REG, 0 );
     OUTREG( SSTREAM_CONTROL_REG, 0 );
@@ -170,6 +193,11 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
     OUTREG( SSTREAM_WINDOW_START_REG, OS_XY(0xfffe, 0xfffe) );
     OUTREG( SSTREAM_WINDOW_SIZE_REG, OS_WH(10,2) );
     OUTREG(STREAMS_FIFO_REG, 2 | 25 << 5 | 32 << 11);
+
+    if (S3_MOBILE_TWISTER_SERIES(psav->Chipset) &&
+        psav->FPExpansion) {
+        OverlayTwisterInit(pScrn);
+    }
 
     {
 	vgaHWPtr hwp;
@@ -193,7 +221,7 @@ static void
 SavageInitStreamsNew(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    unsigned long jDelta;
+    /*unsigned long jDelta;*/
 
     xf86ErrorFVerb(STREAMS_TRACE, "SavageInitStreams\n" );
 
@@ -206,15 +234,40 @@ SavageInitStreamsNew(ScrnInfoPtr pScrn)
     }
 
     /* Primary stream reflects the frame buffer. */
+    OUTREG32(PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset);
+    if (!psav->bTiled) {
+        OUTREG(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000) |
+                 (psav->lDelta & 0x00001fff));
+    }
+    else if (pScrn->bitsPerPixel == 16) {
+        /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
+        OUTREG(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
+                 | 0x80000000 | (psav->lDelta & 0x00001fff));
+    }
+    else if (pScrn->bitsPerPixel == 32) {
+        OUTREG(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
+                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
+    }
+    OUTREG(PRI_STREAM_BUFFERSIZE,
+             pScrn->virtualX * pScrn->virtualY * (pScrn->bitsPerPixel >> 3));
 
-    if (psav->FBStart2nd)
-	jDelta = pScrn->displayWidth;
-    else
+    if (psav->FBStart2nd) {
+	unsigned long jDelta = pScrn->displayWidth;
+    	OUTREG( PRI_STREAM_BUFFERSIZE, jDelta * pScrn->virtualY >> 3 );
+    	OUTREG( PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset );
+    	OUTREG( PRI_STREAM_STRIDE, jDelta );
+    }
+#if 0 
+    else {
 	jDelta = pScrn->displayWidth * (pScrn->bitsPerPixel + 7) / 8;
-    
-    OUTREG( PRI_STREAM_BUFFERSIZE, jDelta * pScrn->virtualY >> 3 );
+    }
+#endif
+    /*OUTREG( PRI_STREAM_BUFFERSIZE, jDelta * pScrn->virtualY >> 3 );*/
     OUTREG( PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset );
-    OUTREG( PRI_STREAM_STRIDE, jDelta );
+    /*OUTREG( PRI_STREAM_STRIDE, jDelta );*/
 
     OUTREG( SEC_STREAM_CKEY_LOW, 0 );
     OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
@@ -254,6 +307,18 @@ SavageInitStreamsNew(ScrnInfoPtr pScrn)
 #endif
 }
 
+/*
+ * Function to get lcd factor, display offset for overlay use
+ * Input: pScrn; Output: x,yfactor, displayoffset in pScrn
+ */
+static void OverlayTwisterInit(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+                                                                                                                    
+    psav->cxScreen = psav->iResX;
+    InitStreamsForExpansion(pScrn);
+    PatchEnableSPofPanel(pScrn);
+}
 
 /* Function to get lcd factor, display offset for overlay use
  * Input: pScrn; Output: x,yfactor, displayoffset in pScrn
@@ -266,6 +331,40 @@ static void OverlayParamInit(ScrnInfoPtr pScrn)
     psav->cxScreen = pScrn->currentMode->HDisplay;
     InitStreamsForExpansion(pScrn);
 }
+
+static
+void PatchEnableSPofPanel(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+                                                                                                                    
+    UnLockExtRegs();
+                                                                                                                    
+    if (pScrn->bitsPerPixel == 8) {
+        OUTREG8(CRT_ADDRESS_REG,0x90);
+        OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0x40);
+    }
+    else  {
+        OUTREG8(CRT_ADDRESS_REG,0x90);
+        OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0x48);
+    }
+                                                                                                                    
+    VerticalRetraceWait();
+                                                                                                                    
+    OUTREG8(CRT_ADDRESS_REG,0x67);
+    OUTREG8(CRT_DATA_REG,(INREG8(CRT_DATA_REG)&0xf3)|0x04);
+                                                                                                                    
+    OUTREG8(CRT_ADDRESS_REG,0x65);
+    OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0xC0);
+                                                                                                                    
+    if (pScrn->bitsPerPixel == 8) {
+        OUTREG32(PSTREAM_CONTROL_REG,0x00000000);
+    } else {
+        OUTREG32(PSTREAM_CONTROL_REG,0x02000000);
+    }
+    OUTREG32(PSTREAM_WINDOW_SIZE_REG, 0x0);
+                                                                                                                    
+}
+
 
 /* Function to calculate lcd expansion x,y factor and offset for overlay
  */
@@ -372,9 +471,6 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
     VGAOUT8( vgaCRIndex, EXT_MISC_CTRL2 );
 
     if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-#if 0 /* I don't think commenting this out is correct (EE) */
-	(psav->Chipset == S3_SUPERSAVAGE) ||
-#endif
 	(psav->Chipset == S3_SAVAGE2000) )
     {
 	SavageInitStreamsNew( pScrn );
@@ -383,7 +479,7 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 
 	/* Wait for VBLANK. */
 	
-	VerticalRetraceWait(psav);
+	VerticalRetraceWait();
 
 	/* Fire up streams! */
 
@@ -400,7 +496,7 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 
 	/* Wait for VBLANK. */
 	
-	VerticalRetraceWait(psav);
+	VerticalRetraceWait();
 
 	/* Fire up streams! */
 
@@ -411,7 +507,7 @@ SavageStreamsOn(ScrnInfoPtr pScrn)
 
     /* Wait for VBLANK. */
     
-    VerticalRetraceWait(psav);
+    VerticalRetraceWait();
 
     /* Turn on secondary stream TV flicker filter, once we support TV. */
 
@@ -439,7 +535,6 @@ SavageStreamsOff(ScrnInfoPtr pScrn)
 
     VGAOUT8( vgaCRIndex, EXT_MISC_CTRL2 );
     if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-        (psav->Chipset == S3_SUPERSAVAGE) ||
         (psav->Chipset == S3_SAVAGE2000) )
 	jStreamsControl = VGAIN8( vgaCRReg ) & NO_STREAMS;
     else
@@ -447,7 +542,7 @@ SavageStreamsOff(ScrnInfoPtr pScrn)
 
     /* Wait for VBLANK. */
 
-    VerticalRetraceWait(psav);
+    VerticalRetraceWait();
 
     /* Kill streams. */
 
