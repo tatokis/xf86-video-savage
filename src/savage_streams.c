@@ -7,10 +7,6 @@
 
 #define STREAMS_TRACE	4
 
-static void SavageInitStreamsOld(ScrnInfoPtr pScrn);
-static void SavageInitStreamsNew(ScrnInfoPtr pScrn);
-static void SavageInitStreams2000(ScrnInfoPtr pScrn);
-
 static void OverlayTwisterInit(ScrnInfoPtr pScrn);
 static void OverlayParamInit(ScrnInfoPtr pScrn);
 static void InitStreamsForExpansion(ScrnInfoPtr pScrn);
@@ -182,8 +178,7 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
     }
 }
 
-static void
-SavageInitStreamsNew(ScrnInfoPtr pScrn)
+void SavageInitStreamsNew(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
     /*unsigned long jDelta;*/
@@ -303,8 +298,7 @@ SavageInitStreamsNew(ScrnInfoPtr pScrn)
     }
 }
 
-static void
-SavageInitStreams2000(ScrnInfoPtr pScrn)
+void SavageInitStreams2000(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
     /*unsigned long jDelta;*/

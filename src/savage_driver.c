@@ -4116,7 +4116,7 @@ SavageDDC1(int scrnIndex)
     InI2CREG(byte,psav->I2CPort);
     OutI2CREG(byte | 0x12,psav->I2CPort);
 
-    pMon = xf86DoEDID_DDC1(scrnIndex,vgaHWddc1SetSpeed,SavageDDC1Read);
+    pMon = xf86DoEDID_DDC1(scrnIndex,vgaHWddc1SetSpeedWeak(),SavageDDC1Read);
     if (!pMon)
         return FALSE;
     
