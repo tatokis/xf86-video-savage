@@ -293,8 +293,11 @@ typedef struct _Savage {
     unsigned long	cobIndex;	/* size index */
     unsigned long	cobSize;	/* size in bytes */
     unsigned long	cobOffset;	/* offset in frame buffer */
-    unsigned long       bciThresholdLo; /* low and hight thresholds for */
+    unsigned long       bciThresholdLo; /* low and high thresholds for */
     unsigned long       bciThresholdHi; /* shadow status update (32bit words) */
+    unsigned long	bciUsedMask;	/* BCI entries used mask */
+    unsigned int	eventStatusReg; /* Status register index that holds
+					 * event counter 0. */
 
     /* Support for DGA */
     int			numDGAModes;

@@ -506,8 +506,8 @@ ShadowWait( SavagePtr psav )
     BCI_SEND( 0x98000000 + psav->ShadowCounter );
 
     while(
-	(int)(psav->ShadowVirtual[1] & 0xffff) != psav->ShadowCounter  &&
-	(loop++ < MAXLOOP)
+	(int)(psav->ShadowVirtual[psav->eventStatusReg] & 0xffff) !=
+	psav->ShadowCounter && (loop++ < MAXLOOP)
     )
 	;
 
@@ -515,11 +515,26 @@ ShadowWait( SavagePtr psav )
 }
 
 static Bool
-ShadowWait1( SavagePtr psav, int v )
+ShadowWaitQueue( SavagePtr psav, int v )
 {
-    return ShadowWait( psav );
-}
+    int loop = 0;
+    CARD32 slots = MAXFIFO - v;
 
+    if (slots >= psav->bciThresholdHi)
+	slots = psav->bciThresholdHi;
+    else
+	return ShadowWait( psav );
+
+    /* Savage 2000 reports only entries filled in the COB, not the on-chip
+     * queue. Also it reports in qword units instead of dwords. */
+    if (psav->Chipset == S3_SAVAGE2000)
+	slots = (slots - 32) / 4;
+
+    while( ((psav->ShadowVirtual[0] & psav->bciUsedMask) >= slots) && (loop++ < MAXLOOP))
+	;
+
+    return loop >= MAXLOOP;
+}
 
 /* Wait until "v" queue entries are free */
 
@@ -532,8 +547,8 @@ WaitQueue3D( SavagePtr psav, int v )
     mem_barrier();
     if( psav->ShadowVirtual )
     {
-	psav->WaitQueue = ShadowWait1;
-	return ShadowWait(psav);
+	psav->WaitQueue = ShadowWaitQueue;
+	return ShadowWaitQueue(psav, v);
     }
     else
     {
@@ -555,8 +570,8 @@ WaitQueue4( SavagePtr psav, int v )
     mem_barrier();
     if( psav->ShadowVirtual )
     {
-	psav->WaitQueue = ShadowWait1;
-	return ShadowWait(psav);
+	psav->WaitQueue = ShadowWaitQueue;
+	return ShadowWaitQueue(psav, v);
     }
     else
 	while( ((ALT_STATUS_WORD0 & 0x001fffff) > slots) && (loop++ < MAXLOOP));
@@ -567,15 +582,15 @@ static int
 WaitQueue2K( SavagePtr psav, int v )
 {
     int loop = 0;
-    CARD32 slots = MAXFIFO - v;
+    CARD32 slots = (MAXFIFO - v) / 4;
 
     if( !psav->NoPCIRetry )
 	return 0;
     mem_barrier();
     if( psav->ShadowVirtual )
     {
-	psav->WaitQueue = ShadowWait1;
-	return ShadowWait(psav);
+	psav->WaitQueue = ShadowWaitQueue;
+	return ShadowWaitQueue(psav, v);
     }
     else
 	while( ((ALT_STATUS_WORD0 & 0x000fffff) > slots) && (loop++ < MAXLOOP))
@@ -1680,7 +1695,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     } else {
         /* We use 128kB for the COB on all other chips. */        
         psav->cobSize = 0x20000;
-	if (S3_SAVAGE3D_SERIES(psav->Chipset)) {
+	if (S3_SAVAGE3D_SERIES(psav->Chipset) ||
+	    psav->Chipset == S3_SAVAGE2000) {
 	    psav->cobIndex = 7; /* rev.A savage4 apparently also uses 7 */
 	} else {
 	    psav->cobIndex = 2;
@@ -1734,6 +1750,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	    psav->WaitQueue	= WaitQueue3D;
 	    psav->WaitIdle	= WaitIdle3D;
 	    psav->WaitIdleEmpty	= WaitIdleEmpty3D;
+	    psav->bciUsedMask   = 0x1ffff;
+	    psav->eventStatusReg= 1;
 	    break;
 
 	case S3_SAVAGE4:
@@ -1744,12 +1762,16 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	    psav->WaitQueue	= WaitQueue4;
 	    psav->WaitIdle	= WaitIdle4;
 	    psav->WaitIdleEmpty	= WaitIdleEmpty4;
+	    psav->bciUsedMask   = 0x1fffff;
+	    psav->eventStatusReg= 1;
 	    break;
 
 	case S3_SAVAGE2000:
 	    psav->WaitQueue	= WaitQueue2K;
 	    psav->WaitIdle	= WaitIdle2K;
 	    psav->WaitIdleEmpty	= WaitIdleEmpty2K;
+	    psav->bciUsedMask   = 0xfffff;
+	    psav->eventStatusReg= 2;
 	    break;
     }
 
@@ -2924,7 +2946,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 		    "Shadow area physical %08lx, linear %p\n",
 		    psav->ShadowPhysical, (void *)psav->ShadowVirtual );
 
-	psav->WaitQueue = ShadowWait1;
+	psav->WaitQueue = ShadowWaitQueue;
 	psav->WaitIdle = ShadowWait;
 	psav->WaitIdleEmpty = ShadowWait;
 

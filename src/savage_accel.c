@@ -342,8 +342,8 @@ SavageInitialize2DEngine(ScrnInfoPtr pScrn)
 	}
 	/* Program shadow status update */ /* AGD: what should this be? */
 	{
-	    unsigned long thresholds = ((psav->bciThresholdHi & 0x1fffe0) << 11) |
-		((psav->bciThresholdLo & 0x1fffe0) >> 5);
+	    unsigned long thresholds = ((psav->bciThresholdLo & 0x1fffe0) << 11) |
+		((psav->bciThresholdHi & 0x1fffe0) >> 5);
 	    OUTREG(0x48C10, thresholds);
 	}
 	/*OUTREG(0x48C10, 0x00700040);*/ /* tim */
@@ -378,8 +378,10 @@ SavageInitialize2DEngine(ScrnInfoPtr pScrn)
 	if( psav->ShadowStatus )
 	{
 	    /* Set shadow update threshholds. */
-	    OUTREG(0x48C10, 0x6090 );
-	    OUTREG(0x48C14, 0x70A8 );
+	    /*OUTREG(0x48C10, 0x6090 );
+	      OUTREG(0x48C14, 0x70A8 );*/
+	    OUTREG(0x48C10, psav->bciThresholdLo >> 2);
+	    OUTREG(0x48C14, psav->bciThresholdHi >> 2);
 	    /* Enable shadow status update */
 	    OUTREG(0x48A30, psav->ShadowPhysical );
 	    /* Enable BCI, command overflow buffer and shadow status. */
