@@ -75,7 +75,7 @@ static void (*SavageDisplayVideo)(
 
 #define MAKE_ATOM(a) MakeAtom(a, sizeof(a) - 1, TRUE)
 
-static Atom xvColorKey, xvBrightness, xvContrast, xvSaturation, xvHue;
+static Atom xvColorKey, xvBrightness, xvContrast, xvSaturation, xvHue, xvInterpolation;
 
 /* client libraries expect an encoding */
 static XF86VideoEncodingRec DummyEncoding[1] =
@@ -88,14 +88,14 @@ static XF86VideoEncodingRec DummyEncoding[1] =
  }
 };
 
-#define NUM_FORMATS 4
+#define NUM_FORMATS 5
 
 static XF86VideoFormatRec Formats[NUM_FORMATS] = 
 {
   {8, PseudoColor},  {15, TrueColor}, {16, TrueColor}, {24, TrueColor}
 };
 
-#define NUM_ATTRIBUTES 5
+#define NUM_ATTRIBUTES 6
 
 static XF86AttributeRec Attributes[NUM_ATTRIBUTES] =
 {
@@ -103,7 +103,8 @@ static XF86AttributeRec Attributes[NUM_ATTRIBUTES] =
    {XvSettable | XvGettable, -128, 127, "XV_BRIGHTNESS"},
    {XvSettable | XvGettable, 0, 255, "XV_CONTRAST"},
    {XvSettable | XvGettable, 0, 255, "XV_SATURATION"},
-   {XvSettable | XvGettable, -180, 180, "XV_HUE"}
+   {XvSettable | XvGettable, -180, 180, "XV_HUE"},
+   {XvSettable | XvGettable, 0, 1, "XV_VERTICAL_INTERPOLATION"}
 };
 
 #define FOURCC_RV16	0x36315652
@@ -186,6 +187,7 @@ typedef struct {
    CARD32	contrast;	/* 0 .. 255 */
    CARD32	saturation;	/* 0 .. 255 */
    int		hue;		/* -128 .. 127 */
+   Bool		interpolation; /* on/off */
 
    FBAreaPtr	area;
    RegionRec	clip;
@@ -676,6 +678,7 @@ SavageSetupImageVideo(ScreenPtr pScreen)
     xvColorKey   = MAKE_ATOM("XV_COLORKEY");
     xvHue        = MAKE_ATOM("XV_HUE");
     xvSaturation = MAKE_ATOM("XV_SATURATION");
+    xvInterpolation = MAKE_ATOM("XV_VERTICAL_INTERPOLATION");
 
     pPriv->colorKey = 
       (1 << pScrn->offset.red) | 
@@ -696,6 +699,8 @@ SavageSetupImageVideo(ScreenPtr pScreen)
 #endif
     pPriv->hue = 0;
     pPriv->lastKnownPitch = 0;
+
+    pPriv->interpolation = FALSE;
 
     /* gotta uninit this someplace */
     REGION_NULL(pScreen, &pPriv->clip);
@@ -856,6 +861,14 @@ SavageSetPortAttribute(
 	if( psav->videoFlags & VF_STREAMS_ON)
 	    SavageSetColor( pScrn );
     }
+    else if( attribute == xvInterpolation) {
+        if((value < 0) || (value > 1))
+            return BadValue;
+        if (value == 1)
+            pPriv->interpolation = TRUE;
+	else
+	    pPriv->interpolation = FALSE;
+    }
     else
 	return BadMatch;
 
@@ -886,6 +899,9 @@ SavageGetPortAttribute(
     }
     else if( attribute == xvSaturation ) {
 	*value = pPriv->saturation;
+    }
+    else if( attribute == xvInterpolation ) {
+        *value = pPriv->interpolation;
     }
     else return BadMatch;
 
@@ -1191,7 +1207,8 @@ SavageDisplayVideoOld(
     /* Calculate vertical scale factor. */
     OUTREG(SSTREAM_VINITIAL_REG, 0 );
     /*OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );*/
-    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));                                                                                  
+    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));
+
     /* Set surface location and stride. */
     OUTREG(SSTREAM_FBADDR0_REG, (offset + (x1>>15)) & (0x1ffffff & ~BASE_PAD) );
     OUTREG(SSTREAM_FBADDR1_REG, 0);
@@ -1207,7 +1224,15 @@ SavageDisplayVideoOld(
      *   bit_15 = 1: Enable vertical interpolation
      *            0: Line duplicaion
      */
-    OUTREG(SSTREAM_LINES_REG, 0x00008000 | src_h );
+    /* 
+     * Vertical Interpolation is very bandwidth intensive.  Some savages can't
+     * seem to handle it.  Default is line doubling.  --AGD
+     */
+    if (pPriv->interpolation) {
+        OUTREG(SSTREAM_LINES_REG, 0x8000 | src_h );
+    } else {
+        OUTREG(SSTREAM_LINES_REG, src_h );
+    }
 
 #if 0
     /* Set color key on primary. */
