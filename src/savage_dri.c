@@ -308,15 +308,6 @@ static Bool SAVAGECreateContext( ScreenPtr pScreen, VisualPtr visual,
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
-#if 0
-    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-    savageAgpBufferPtr pAgp;
-    
-    int ret,size,i;
-    unsigned long  handle,map_handle;
-    SAVAGESAREAPrivPtr pShare;
-    unsigned long offset;
-#endif
 
     if(psav->xvmcContext)
         return FALSE;
@@ -325,51 +316,7 @@ static Bool SAVAGECreateContext( ScreenPtr pScreen, VisualPtr visual,
         psav->DRIrunning++;
     }
 
-#if 0
-    /* alloc agp memory to dma */
-    pShare = (SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
-    /* find the available buffer*/
-    for (i=0,pAgp = pSAVAGEDRIServer->agpBuffer;i<pSAVAGEDRIServer->numBuffer;i++,pAgp++)
-    {
-        if (pAgp->flags==0)
-            break;
-    }
-    if (i >= pSAVAGEDRIServer->numBuffer)
-    {
-        return TRUE;
-    }
-          
-    offset=pAgp->agp_offset;
-    size = DRM_SAVAGE_DMA_AGP_SIZE;
-    if (size <=0)
-        return TRUE;
-    ret=drmAgpAlloc( psav->drmFD,size,0,NULL,&handle);
-    if ( ret<0)
-    {
-        return TRUE;
-    }
-    ret=drmAgpBind( psav->drmFD,handle,offset);
-    if (ret<0)
-    {
-        return TRUE;
-    }
-    if (drmAddMap(psav->drmFD,
-                  offset,
-                  DRM_SAVAGE_DMA_AGP_SIZE,
-                  DRM_AGP,
-                  0,
-                  &map_handle)<0)
-    {
-        return TRUE;
-    }
-    pAgp->ctxOwner = hwContext;
-    pAgp->flags = 1;
-    pAgp->agp_handle = handle;
-    pAgp->map_handle = map_handle;
-#endif
-    
     return TRUE;
-    
 }
 
 static void SAVAGEDestroyContext( ScreenPtr pScreen, drm_context_t hwContext,
@@ -377,266 +324,9 @@ static void SAVAGEDestroyContext( ScreenPtr pScreen, drm_context_t hwContext,
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
-#if 0
-    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-    savageAgpBufferPtr pAgp;
-    SAVAGESAREAPrivPtr pShare;
-    int i;
-    unsigned long handle,map_handle;
-#endif
+
     psav->DRIrunning--;
-#if 0
-    pShare = (SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
-    
-    for (i=0,pAgp = pSAVAGEDRIServer->agpBuffer;i<pSAVAGEDRIServer->numBuffer;i++,pAgp++)
-    {
-        if (pAgp->ctxOwner == hwContext)
-            break;
-    }
-    if (i >= pSAVAGEDRIServer->numBuffer || !pAgp->flags || !pAgp->agp_handle)
-    {
-        return;
-    }
-    handle = pAgp->agp_handle;
-    map_handle = pAgp->map_handle;
-    drmRmMap(psav->drmFD,map_handle);
-    drmAgpUnbind(psav->drmFD,handle);
-    drmAgpFree(psav->drmFD,handle);
-    pAgp->flags=0;
-    pAgp->ctxOwner=0;
-#endif
 }
-
-#if 0
-/* Quiescence, locking
- */
-#define SAVAGE_TIMEOUT		2048
-
-static void SAVAGEWaitForIdleDMA( ScrnInfoPtr pScrn )
-{
-   SavagePtr psav = SAVPTR(pScrn);
-   int ret;
-   int i = 0;
-
-   for (;;) {
-      do {
-	 ret = drmSAVAGEFlushDMA( psav->drmFD,
-			       DRM_LOCK_QUIESCENT | DRM_LOCK_FLUSH );
-      } while ( ( ret == -EBUSY ) && ( i++ < SAVAGE_TIMEOUT ) );
-
-      if ( ret == 0 )
-	 return;
-
-      xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
-		  "[dri] Idle timed out, resetting engine...\n" );
-
-      drmSAVAGEEngineReset( psav->drmFD );
-   }
-}
-
-
-void SAVAGEGetQuiescence( ScrnInfoPtr pScrn )
-{
-   SavagePtr psav = SAVPTR(pScrn);
-
-   DRILock( screenInfo.screens[pScrn->scrnIndex], 0 );
-   psav->haveQuiescense = 1;
-
-   if ( psav->directRenderingEnabled ) {
-      SAVAGEFBLayout *pLayout = &psav->CurrentLayout;
-
-      SAVAGEWaitForIdleDMA( pScrn );
-
-      WAITFIFO( 11 );
-      OUTREG( SAVAGEREG_MACCESS, psav->MAccess );
-      OUTREG( SAVAGEREG_PITCH, pLayout->displayWidth );
-
-      psav->PlaneMask = ~0;
-      OUTREG( SAVAGEREG_PLNWT, psav->PlaneMask );
-
-      psav->BgColor = 0;
-      psav->FgColor = 0;
-      OUTREG( SAVAGEREG_BCOL, psav->BgColor );
-      OUTREG( SAVAGEREG_FCOL, psav->FgColor );
-      OUTREG( SAVAGEREG_SRCORG, psav->realSrcOrg );
-
-      psav->SrcOrg = 0;
-      OUTREG( SAVAGEREG_DSTORG, psav->DstOrg );
-      OUTREG( SAVAGEREG_OPMODE, SAVAGEOPM_DMA_BLIT );
-      OUTREG( SAVAGEREG_CXBNDRY, 0xFFFF0000 ); /* (maxX << 16) | minX */
-      OUTREG( SAVAGEREG_YTOP, 0x00000000 );    /* minPixelPointer */
-      OUTREG( SAVAGEREG_YBOT, 0x007FFFFF );    /* maxPixelPointer */
-
-      psav->AccelFlags &= ~CLIPPER_ON;
-   }
-}
-
-void SAVAGEGetQuiescenceShared( ScrnInfoPtr pScrn )
-{
-   SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEEntPtr pSAVAGEEnt = psav->entityPrivate;
-   SavagePtr pSAVAGE2 = SAVPTR(pSAVAGEEnt->pScrn_2);
-
-   DRILock( screenInfo.screens[pSAVAGEEnt->pScrn_1->scrnIndex], 0 );
-
-   psav = SAVPTR(pSAVAGEEnt->pScrn_1);
-   psav->haveQuiescense = 1;
-   pSAVAGE2->haveQuiescense = 1;
-
-   if ( pSAVAGEEnt->directRenderingEnabled ) {
-      SAVAGEWaitForIdleDMA( pSAVAGEEnt->pScrn_1 );
-      psav->RestoreAccelState( pScrn );
-      xf86SetLastScrnFlag( pScrn->entityList[0], pScrn->scrnIndex );
-   }
-}
-
-#endif 
-
-/* move in SAVAGEDRISwapContext() */
-#if 0
-static void SAVAGESwapContext( ScreenPtr pScreen )
-{
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-
-   /* Arrange for dma_quiescence and xaa sync to be called as
-    * appropriate.
-    */
-   psav->LockHeld = 1;   /* port as pMGA->haveQuiescense*/
-   psav->AccelInfoRec->NeedToSync = TRUE;
-}
-#endif
-
-/* no double-head */
-#if 0
-static void SAVAGESwapContextShared( ScreenPtr pScreen )
-{
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEEntPtr pSAVAGEEnt = psav->entityPrivate;
-   SavagePtr pSAVAGE2 = SAVPTR(pSAVAGEEnt->pScrn_2);
-
-   psav = SAVPTR(pSAVAGEEnt->pScrn_1);
-
-   psav->haveQuiescense = 0;
-   psav->AccelInfoRec->NeedToSync = TRUE;
-
-   pSAVAGE2->haveQuiescense = 0;
-   pSAVAGE2->AccelInfoRec->NeedToSync = TRUE;
-}
-#endif 
-
-/* This is really only called from validate/postvalidate as we
- * override the dri lock/unlock.  Want to remove validate/postvalidate
- * processing, but need to remove all client-side use of drawable lock
- * first (otherwise there is noone recover when a client dies holding
- * the drawable lock).
- *
- * What does this mean?
- *
- *   - The above code gets executed every time a
- *     window changes shape or the focus changes, which isn't really
- *     optimal.
- *   - The X server therefore believes it needs to do an XAA sync
- *     *and* a dma quiescense ioctl each time that happens.
- *
- * We don't wrap wakeuphandler any longer, so at least we can say that
- * this doesn't happen *every time the mouse moves*...
- */
-#if 0
-static void
-SAVAGEDRISwapContext( ScreenPtr pScreen, DRISyncType syncType,
-		   DRIContextType oldContextType, void *oldContext,
-		   DRIContextType newContextType, void *newContext )
-{
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-
-#if 1
-   /* this case call from DRIDoWakeupandler,  */
-   /* swap context in                         */
-   if ( syncType == DRI_3D_SYNC &&
-	oldContextType == DRI_2D_CONTEXT &&
-	newContextType == DRI_2D_CONTEXT )
-   {
-      psav->LockHeld = 1;   /* port as pMGA->haveQuiescense*/
-      psav->AccelInfoRec->NeedToSync = TRUE;
-   }
-   /* this case call from DRIDoBlockHandler,   */
-   /* swap context out                         */
-   else if (syncType == DRI_2D_SYNC &&
-	    oldContextType == DRI_NO_CONTEXT &&
-	    newContextType == DRI_2D_CONTEXT)
-   {
-      psav->LockHeld = 0;
-      psav->AccelInfoRec->NeedToSync = TRUE;
-   }
-#endif
-}
-#endif
-
-/* no Double-Head */
-#if 0
-static void
-SAVAGEDRISwapContextShared( ScreenPtr pScreen, DRISyncType syncType,
-			  DRIContextType oldContextType, void *oldContext,
-			  DRIContextType newContextType, void *newContext )
-{
-#if 0
-   if ( syncType == DRI_3D_SYNC &&
-	oldContextType == DRI_2D_CONTEXT &&
-	newContextType == DRI_2D_CONTEXT )
-   {
-      SAVAGESwapContextShared( pScreen );
-   }
-#endif
-}
-#endif
-
-/* following I810 and R128 swaping  method      */
-/*       MGA swaping method is for their double head  */
-#if 0
-static void SAVAGEWakeupHandler( int screenNum, pointer wakeupData,
-			      unsigned long result, pointer pReadmask )
-{
-    ScreenPtr pScreen = screenInfo.screens[screenNum];
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-
-    if ( xf86IsEntityShared( pScrn->entityList[0] ) ) {
-        SAVAGESwapContextShared( pScreen );
-    } else {
-        SAVAGESwapContext( pScreen );
-    }
-}
-
-static void SAVAGEBlockHandler( int screenNum, pointer blockData,
-			     pointer pTimeout, pointer pReadmask )
-
-{
-   ScreenPtr pScreen = screenInfo.screens[screenNum];
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEEntPtr pSAVAGEEnt;
-
-   if ( psav->haveQuiescense ) {
-      if ( xf86IsEntityShared( pScrn->entityList[0] ) ) {
-	 /* Restore to first screen */
-	 psav->RestoreAccelState( pScrn );
-	 xf86SetLastScrnFlag( pScrn->entityList[0], pScrn->scrnIndex );
-	 pSAVAGEEnt = psav->entityPrivate;
-
-	 if ( pSAVAGEEnt->directRenderingEnabled ) {
-	    DRIUnlock( screenInfo.screens[pSAVAGEEnt->pScrn_1->scrnIndex] );
-	 }
-      } else {
-	 if ( psav->directRenderingEnabled ) {
-	    DRIUnlock( pScreen );
-	 }
-      }
-      psav->haveQuiescense = 0;
-   }
-}
-#endif
 
 static void SAVAGEWakeupHandler( int screenNum, pointer wakeupData,
 				 unsigned long result, pointer pReadmask )
@@ -735,8 +425,6 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    unsigned int vendor, device;
    unsigned int offset;
    int ret;
-   /*int size,numbuffer,i;
-   savageAgpBufferPtr agpbuffer;*/
 
    if (psav->agpSize < 2) psav->agpSize = 2; /* at least 2MB for DMA buffers */
 
@@ -902,24 +590,6 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
 	       "[agp] agpTextures mapped at 0x%08lx\n",
 	       (unsigned long)pSAVAGEDRIServer->agpTextures.map );
    */
-
-   /* for agp dma buffer*/
-#if 0
-   size = drmAgpSize(psav->drmFD);
-   size -=    pSAVAGEDRIServer->agpTextures.size;/*sub texture size*/
-   numbuffer = size /  DRM_SAVAGE_DMA_AGP_SIZE;
-   agpbuffer = (savageAgpBufferPtr)xcalloc(sizeof(savageAgpBuffer),numbuffer);
-   for (i=0;i<numbuffer;i++)
-   {
-       agpbuffer[i].ctxOwner = 0;
-       agpbuffer[i].agp_offset =
-           pSAVAGEDRIServer->agpTextures.size + i* DRM_SAVAGE_DMA_AGP_SIZE;
-       agpbuffer[i].flags = 0;
-       agpbuffer[i].agp_handle = 0;
-   }
-   pSAVAGEDRIServer->numBuffer = numbuffer;
-   pSAVAGEDRIServer->agpBuffer = agpbuffer;
-#endif
    
    return TRUE;
 }
@@ -1133,22 +803,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    SAVAGEDRIPtr pSAVAGEDRI;
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer;
 
-/*  disable first....*/
-#if 0
-   switch ( psav->Chipset ) {
-   case PCI_CHIP_SAVAGEG400:
-   case PCI_CHIP_SAVAGEG200:
-#if 0
-   case PCI_CHIP_SAVAGEG200_PCI:
-#endif
-      break;
-   default:
-      xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
-		  "[drm] Direct rendering only supported with AGP G200/G400 cards!\n" );
-      return FALSE;
-   }
-#endif
-
    /* Check that the GLX, DRI, and DRM modules have been loaded by testing
     * for canonical symbols in each module.
     */
@@ -1161,8 +815,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       return FALSE;
    }
 
-/* disable first */
-#if 1
    /* Check the DRI version */
    {
       int major, minor, patch;
@@ -1176,7 +828,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
          return FALSE;
       }
    }
-#endif
 
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[drm] bpp: %d depth: %d\n",
@@ -1217,13 +868,10 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    pDRIInfo->frameBufferStride = pScrn->displayWidth*(pScrn->bitsPerPixel/8);
    pDRIInfo->ddxDrawableTableEntry = SAVAGE_MAX_DRAWABLES;
 
-/* mark off these... we use default */
-/* FK: switch them on again */
-#if 1
+   /* override default DRI block and wakeup handler */
    pDRIInfo->wrap.BlockHandler = SAVAGEBlockHandler;
    pDRIInfo->wrap.WakeupHandler = SAVAGEWakeupHandler;
-#endif
-   
+
    pDRIInfo->wrap.ValidateTree = NULL;
    pDRIInfo->wrap.PostValidateTree = NULL;
 
@@ -1280,17 +928,8 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    pDRIInfo->CreateContext = SAVAGECreateContext;
    pDRIInfo->DestroyContext = SAVAGEDestroyContext;
 
-/* we don't have double head */
-#if 0   
-   if ( xf86IsEntityShared( pScrn->entityList[0] ) ) {
-      pDRIInfo->SwapContext = SAVAGEDRISwapContextShared;
-   } else
-#endif
- 
-   {
-      pDRIInfo->SwapContext = NULL/*SAVAGEDRISwapContext*/;
-      /* FK: SwapContext no longer used with KERNEL_SWAP. */
-   }
+   /* FK: SwapContext is not used with KERNEL_SWAP. */
+   pDRIInfo->SwapContext = NULL;
 
    pDRIInfo->InitBuffers = SAVAGEDRIInitBuffers;
    pDRIInfo->MoveBuffers = SAVAGEDRIMoveBuffers;
@@ -1310,8 +949,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       return FALSE;
    }
 
-/* Disable these */
-#if 1
    /* Check the SAVAGE DRM version */
    {
       drmVersionPtr version = drmGetVersion(psav->drmFD);
@@ -1345,25 +982,6 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
          drmFreeVersion( version );
       }
    }
-#endif
-
-#if 0
-   /* Calculate texture constants for AGP texture space.
-    * FIXME: move!
-    */
-   {
-      CARD32 agpTextureOffset = SAVAGE_DMA_BUF_SZ * SAVAGE_DMA_BUF_NR;
-      CARD32 agpTextureSize = pSAVAGEDRI->agp.size - agpTextureOffset;
-
-      i = mylog2(agpTextureSize / SAVAGE_NR_TEX_REGIONS);
-      if (i < SAVAGE_LOG_MIN_TEX_REGION_SIZE)
-         i = SAVAGE_LOG_MIN_TEX_REGION_SIZE;
-
-      pSAVAGEDRI->logAgpTextureGranularity = i;
-      pSAVAGEDRI->agpTextureSize = (agpTextureSize >> i) << i;
-      pSAVAGEDRI->agpTextureOffset = agpTextureOffset;
-   }
-#endif
 
    if ( !psav->IsPCI && !SAVAGEDRIAgpInit( pScreen ) ) {
        /*
@@ -1618,16 +1236,6 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
    SavagePtr psav = SAVPTR(pScrn);
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
 
-/* no DMA now..... */
-#if 0
-   if ( pSAVAGEDRIServer->drmBuffers ) {
-      drmUnmapBufs( pSAVAGEDRIServer->drmBuffers );
-      pSAVAGEDRIServer->drmBuffers = NULL;
-   }
-
-   drmSAVAGECleanupDMA( psav->drmFD );
-#endif
-
    if ( pSAVAGEDRIServer->status.map ) {
       drmUnmap( pSAVAGEDRIServer->status.map, pSAVAGEDRIServer->status.size );
       pSAVAGEDRIServer->status.map = NULL;
@@ -1661,20 +1269,13 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
    if (pSAVAGEDRIServer->agpTextures.handle)
        drmRmMap(psav->drmFD,pSAVAGEDRIServer->agpTextures.handle);
 
+   if (pSAVAGEDRIServer->cmdDma.handle)
+       drmRmMap(psav->drmFD,pSAVAGEDRIServer->cmdDma.handle);
+
    if ( pSAVAGEDRIServer->buffers.map ) {
       drmUnmap( pSAVAGEDRIServer->buffers.map, pSAVAGEDRIServer->buffers.size );
       pSAVAGEDRIServer->buffers.map = NULL;
    }
-#if 0
-   if ( pSAVAGEDRIServer->primary.map ) {
-      drmUnmap( pSAVAGEDRIServer->primary.map, pSAVAGEDRIServer->primary.size );
-      pSAVAGEDRIServer->primary.map = NULL;
-   }
-   if ( pSAVAGEDRIServer->warp.map ) {
-      drmUnmap( pSAVAGEDRIServer->warp.map, pSAVAGEDRIServer->warp.size );
-      pSAVAGEDRIServer->warp.map = NULL;
-   }
-#endif
 
    if ( pSAVAGEDRIServer->agp.handle ) {
       drmAgpUnbind( psav->drmFD, pSAVAGEDRIServer->agp.handle );

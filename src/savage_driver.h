@@ -32,6 +32,69 @@
 #include "savage_dri.h"
 #include "dri.h"
 #include "GL/glxint.h"
+#include "xf86drm.h"
+
+/* Totals 2 Mbytes which equals 2^16 32-byte vertices divided among up
+ * to 32 clients. */
+#define SAVAGE_NUM_BUFFERS 32
+#define SAVAGE_BUFFER_SIZE (1 << 16) /* 64k */
+
+#define SAVAGE_CMDDMA_SIZE 0x100000 /* 1MB */
+
+#define SAVAGE_DEFAULT_AGP_MODE     1
+#define SAVAGE_MAX_AGP_MODE         4
+
+/* Buffer are aligned on 4096 byte boundaries.
+ */
+/*  this is used for backbuffer, depthbuffer, etc..*/
+/*          alignment                                      */
+
+#define SAVAGE_BUFFER_ALIGN	0x00000fff
+
+typedef struct _server{
+   int reserved_map_agpstart;
+   int reserved_map_idx;
+
+   int sarea_priv_offset;
+
+   int chipset;
+   int sgram;     /* seems no use */
+
+   unsigned int frontOffset;
+   unsigned int frontPitch;
+   unsigned int frontbufferSize;
+   unsigned int frontBitmapDesc;
+   
+   unsigned int backOffset;
+   unsigned int backPitch;
+   unsigned int backbufferSize;
+   unsigned int backBitmapDesc;
+
+   unsigned int depthOffset;
+   unsigned int depthPitch;
+   unsigned int depthbufferSize;
+   unsigned int depthBitmapDesc;
+
+   unsigned int textureOffset;
+   int textureSize;
+   int logTextureGranularity;
+
+   drmRegion agp;
+
+   /* PCI mappings */
+   drmRegion aperture;
+   drmRegion registers;
+   drmRegion status;
+
+   /* AGP mappings */
+   drmRegion buffers;
+   drmRegion agpTextures;
+   int logAgpTextureGranularity;
+
+   /* command DMA */
+   drmRegion cmdDma;
+} SAVAGEDRIServerPrivateRec, *SAVAGEDRIServerPrivatePtr;
+
 #endif
 
 typedef enum {
