@@ -1,14 +1,13 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_video.c,v 1.7 2001/11/21 22:43:01 dawes Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_video.c,v 1.17tsi Exp $ */
 
 #include "Xv.h"
 #include "dix.h"
 #include "dixstruct.h"
 #include "fourcc.h"
+#include "xaalocal.h"
 
 #include "savage_driver.h"
-#include "savage_regs.h"
-#include "savage_bci.h"
-
+#include "savage_streams.h"
 
 #define OFF_DELAY 	200  /* milliseconds */
 #define FREE_DELAY 	60000
@@ -19,24 +18,7 @@
 
 #define TIMER_MASK      (OFF_TIMER | FREE_TIMER)
 
-#define HSCALING_Shift    0
-#define HSCALING_Mask     (((1L << 16)-1) << HSCALING_Shift)
-#define HSCALING(w0,w1)   ((((unsigned int)(((double)w0/(double)w1) * (1 << 15))) \
-                               << HSCALING_Shift) \
-                           & HSCALING_Mask)
-
-#define VSCALING_Shift    0
-#define VSCALING_Mask     (((1L << 20)-1) << VSCALING_Shift)
-#define VSCALING(h0,h1)   ((((unsigned int) (((double)h0/(double)h1) * (1 << 15))) \
-                               << VSCALING_Shift) \
-                           & VSCALING_Mask)
-
-#ifndef XvExtension
-void SavageInitVideo(ScreenPtr pScreen) {}
-void SavageResetVideo(ScrnInfoPtr pScrn) {}
-#else
-
-void myOUTREG( SavagePtr psav, unsigned long offset, unsigned long value );
+void savageOUTREG( SavagePtr psav, unsigned long offset, unsigned long value );
 
 static XF86VideoAdaptorPtr SavageSetupImageVideo(ScreenPtr);
 static void SavageInitOffscreenImages(ScreenPtr);
@@ -51,13 +33,7 @@ static int SavagePutImage( ScrnInfoPtr,
 static int SavageQueryImageAttributes(ScrnInfoPtr, 
 	int, unsigned short *, unsigned short *,  int *, int *);
 
-void SavageStreamsOn(ScrnInfoPtr pScrn, int id);
-void SavageStreamsOff(ScrnInfoPtr pScrn);
 void SavageResetVideo(ScrnInfoPtr pScrn); 
-
-static void SavageInitStreamsOld(ScrnInfoPtr pScrn);
-static void SavageInitStreamsNew(ScrnInfoPtr pScrn);
-static void (*SavageInitStreams)(ScrnInfoPtr pScrn) = NULL;
 
 static void SavageSetColorKeyOld(ScrnInfoPtr pScrn);
 static void SavageSetColorKeyNew(ScrnInfoPtr pScrn);
@@ -91,10 +67,6 @@ static void (*SavageDisplayVideo)(
     short src_w, short src_h,
     short drw_w, short drw_h
 ) = NULL;
-
-static void OverlayTwisterInit(ScrnInfoPtr pScrn);
-static void OverlayParamInit(ScrnInfoPtr pScrn);
-static void InitStreamsForExpansion(ScrnInfoPtr pScrn);
 
 /*static void SavageBlockHandler(int, pointer, pointer, pointer);*/
 
@@ -227,17 +199,6 @@ typedef struct {
 #define GET_PORT_PRIVATE(pScrn) \
    (SavagePortPrivPtr)((SAVPTR(pScrn))->adaptor->pPortPrivates[0].ptr)
 
-
-/*
- * There are two different streams engines used in the Savage line.
- * The old engine is in the 3D, 4, Pro, and Twister.
- * The new engine is in the 2000, MX, IX, and Super.
- */
-
-
-#define OS_XY(x,y)	(((x+1)<<16)|(y+1))
-#define OS_WH(x,y)	(((x-1)<<16)|(y))
-
 static
 unsigned int GetBlendForFourCC( int id )
 {
@@ -257,280 +218,29 @@ unsigned int GetBlendForFourCC( int id )
     }
 }
 
-void myOUTREG( SavagePtr psav, unsigned long offset, unsigned long value )
+void savageOUTREG( SavagePtr psav, unsigned long offset, unsigned long value )
 {
-    ErrorF( "MMIO %04x, was %08x, want %08x,", 
-	offset, MMIO_IN32( psav->MapBase, offset ), value );
+    ErrorF( "MMIO %08lx, was %08lx, want %08lx,", 
+	offset, (CARD32)MMIO_IN32( psav->MapBase, offset ), value );
     MMIO_OUT32( psav->MapBase, offset, value );
-    ErrorF( " now %08x\n", MMIO_IN32( psav->MapBase, offset ) );
+    ErrorF( " now %08lx\n", (CARD32)MMIO_IN32( psav->MapBase, offset ) );
 }
 
-void SavageInitStreamsOld(ScrnInfoPtr pScrn)
+
+static void
+SavageClipVWindow(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    /*unsigned long jDelta;*/
-    unsigned long format = 0;
-
-    /*
-     * For the OLD streams engine, several of these registers
-     * cannot be touched unless streams are on.  Seems backwards to me;
-     * I'd want to set 'em up, then cut 'em loose.
-     */
-
-    xf86ErrorFVerb(XVTRACE, "SavageInitStreams\n" );
-
-    /* Primary stream reflects the frame buffer. */
-
-/* I don't know if these are needed here or not.  seems to work either way
- * and the stride should have already been set properly in SavageSetGBD()
- */
-    if (!psav->bTiled) {
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000) |
-                 (psav->lDelta & 0x00001fff));
+  
+    if( (psav->Chipset == S3_SAVAGE_MX)  ||
+	(psav->Chipset == S3_SUPERSAVAGE) ||
+        (psav->Chipset == S3_SAVAGE2000) ) {
+	OUTREG(SEC_STREAM_WINDOW_SZ, 0);
+  
+    } else {
+	OUTREG( SSTREAM_WINDOW_SIZE_REG, 1);
+	OUTREG( SSTREAM_WINDOW_START_REG, 0x03ff03ff);
     }
-    else if (pScrn->bitsPerPixel == 16) {
-        /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
-                 | 0x80000000 | (psav->lDelta & 0x00001fff));
-    }
-    else if (pScrn->bitsPerPixel == 32) {
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
-                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
-    }
-    OUTREG(PSTREAM_FBSIZE_REG, 
-		pScrn->virtualY * pScrn->virtualX * (pScrn->bitsPerPixel >> 3));
-
-    switch( pScrn->depth ) {
-    case  8: format = 0 << 24; break;
-    case 15: format = 3 << 24; break;
-    case 16: format = 5 << 24; break;
-    case 24: format = 7 << 24; break;
-    }
-
-    /*jDelta = pScrn->displayWidth * pScrn->bitsPerPixel / 8;*/
-    OUTREG( PSTREAM_WINDOW_START_REG, OS_XY(0,0) );
-    OUTREG( PSTREAM_WINDOW_SIZE_REG, OS_WH(pScrn->displayWidth, pScrn->virtualY) );
-    OUTREG( PSTREAM_FBADDR0_REG, pScrn->fbOffset );
-    OUTREG( PSTREAM_FBADDR1_REG, 0 );
-    /*OUTREG( PSTREAM_STRIDE_REG, jDelta );*/
-    OUTREG( PSTREAM_CONTROL_REG, format );
-    /*OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );*/
-
-    OUTREG( COL_CHROMA_KEY_CONTROL_REG, 0 );
-    OUTREG( SSTREAM_CONTROL_REG, 0 );
-    OUTREG( CHROMA_KEY_UPPER_BOUND_REG, 0 );
-    OUTREG( SSTREAM_STRETCH_REG, 0 );
-    OUTREG( COLOR_ADJUSTMENT_REG, 0 );
-    OUTREG( BLEND_CONTROL_REG, 1 << 24 );
-    OUTREG( DOUBLE_BUFFER_REG, 0 );
-    OUTREG( SSTREAM_FBADDR0_REG, 0 );
-    OUTREG( SSTREAM_FBADDR1_REG, 0 );
-    OUTREG( SSTREAM_FBADDR2_REG, 0 );
-/*    OUTREG( SSTREAM_FBSIZE_REG, 0 ); */
-    OUTREG( SSTREAM_STRIDE_REG, 0 );
-    OUTREG( SSTREAM_VSCALE_REG, 0 );
-    OUTREG( SSTREAM_LINES_REG, 0 );
-    OUTREG( SSTREAM_VINITIAL_REG, 0 );
-    OUTREG( SSTREAM_WINDOW_START_REG, OS_XY(0xfffe, 0xfffe) );
-    OUTREG( SSTREAM_WINDOW_SIZE_REG, OS_WH(10,2) );
-
-    if (S3_MOBILE_TWISTER_SERIES(psav->Chipset) &&
-        psav->FPExpansion) {
-        OverlayTwisterInit(pScrn);
-    }
-
-}
-
-void SavageInitStreamsNew(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    /*unsigned long jDelta;*/
-
-    xf86ErrorFVerb(XVTRACE, "SavageInitStreams\n" );
-
-    if( 
-	S3_SAVAGE_MOBILE_SERIES(psav->Chipset) && 
-	!psav->CrtOnly && 
-	!psav->TvOn 
-    ) {
-	OverlayParamInit( pScrn );
-    }
-
-/* I don't know if these are needed here or not.  seems to work either way
- * and the stride should have already been set properly in SavageSetGBD()
- */
-    /* Primary stream reflects the frame buffer. */
-    OUTREG32(PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset);
-    if (!psav->bTiled) {
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000) |
-                 (psav->lDelta & 0x00001fff));
-    }
-    else if (pScrn->bitsPerPixel == 16) {
-        /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
-                 | 0x80000000 | (psav->lDelta & 0x00001fff));
-    }
-    else if (pScrn->bitsPerPixel == 32) {
-        OUTREG(PRI_STREAM_STRIDE,
-                 (((psav->lDelta * 2) << 16) & 0x3FFFE000)
-                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
-    }
-    OUTREG(PSTREAM_FBSIZE_REG,
-             pScrn->virtualX * pScrn->virtualY * (pScrn->bitsPerPixel >> 3));
-    /* Primary stream reflects the frame buffer. */
-#if 0
-    jDelta = pScrn->displayWidth * pScrn->bitsPerPixel / 8;
-    OUTREG( PRI_STREAM_BUFFERSIZE, jDelta * pScrn->virtualY >> 3 );
-    OUTREG( PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset );
-    OUTREG( PRI_STREAM_STRIDE, jDelta );
-#endif
-    OUTREG( SEC_STREAM_CKEY_LOW, 0 );
-    OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
-    OUTREG( SEC_STREAM_HSCALING, 0 );
-    OUTREG( SEC_STREAM_VSCALING, 0 );
-    OUTREG( BLEND_CONTROL, 0 );
-    OUTREG( SEC_STREAM_FBUF_ADDR0, 0 );
-    OUTREG( SEC_STREAM_FBUF_ADDR1, 0 );
-    OUTREG( SEC_STREAM_FBUF_ADDR2, 0 );
-    OUTREG( SEC_STREAM_WINDOW_START, 0 );
-    OUTREG( SEC_STREAM_WINDOW_SZ, 0 );
-/*    OUTREG( SEC_STREAM_BUFFERSIZE, 0 ); */
-    OUTREG( SEC_STREAM_TILE_OFF, 0 );
-    OUTREG( SEC_STREAM_OPAQUE_OVERLAY, 0 );
-    OUTREG( SEC_STREAM_STRIDE, 0 );
-
-    /* These values specify brightness, contrast, saturation and hue. */
-    OUTREG( SEC_STREAM_COLOR_CONVERT1, 0x0000C892 );
-    OUTREG( SEC_STREAM_COLOR_CONVERT2, 0x00039F9A );
-    OUTREG( SEC_STREAM_COLOR_CONVERT3, 0x01F1547E );
-}
-
-void SavageStreamsOn(ScrnInfoPtr pScrn, int id)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    unsigned char jStreamsControl;
-    unsigned short vgaCRIndex = psav->vgaIOBase + 4;
-    unsigned short vgaCRReg = psav->vgaIOBase + 5;
-
-    xf86ErrorFVerb(XVTRACE, "SavageStreamsOn\n" );
-
-    /* Sequence stolen from streams.c in M7 NT driver */
-
-    xf86EnableIO();
-
-    /* Unlock extended registers. */
-
-    VGAOUT16(vgaCRIndex, 0x4838);
-    VGAOUT16(vgaCRIndex, 0xa039);
-    VGAOUT16(0x3c4, 0x0608);
-
-    if( 
-	S3_SAVAGE_MOBILE_SERIES(psav->Chipset) && 
-	!psav->CrtOnly && 
-	!psav->TvOn 
-    ) {
-	OverlayParamInit( pScrn );
-    }
-
-    VGAOUT8( vgaCRIndex, EXT_MISC_CTRL2 );
-
-    if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-        (psav->Chipset == S3_SAVAGE2000) )
-    {
-	jStreamsControl = VGAIN8( vgaCRReg ) | ENABLE_STREAM1;
-
-	/* Wait for VBLANK. */
-	
-	VerticalRetraceWait();
-
-	/* Fire up streams! */
-
-	VGAOUT16( vgaCRIndex, (jStreamsControl << 8) | EXT_MISC_CTRL2 );
-
-	psav->blendBase = GetBlendForFourCC( id ) << 9;
-	xf86ErrorFVerb(XVTRACE+1,"Format %4.4s, blend is %08x\n", &id, psav->blendBase );
-	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
-
-	/* These values specify brightness, contrast, saturation and hue. */
-	OUTREG( SEC_STREAM_COLOR_CONVERT1, 0x0000C892 );
-	OUTREG( SEC_STREAM_COLOR_CONVERT2, 0x00039F9A );
-	OUTREG( SEC_STREAM_COLOR_CONVERT3, 0x01F1547E );
-    }
-    else
-    {
-        if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
-            && psav->FPExpansion) {
-	    jStreamsControl = VGAIN8( vgaCRReg ) | ENABLE_STREAMS_OLD; /* tim */
-            /*jStreamsControl = VGAIN8( vgaCRReg ) | 0x8c;*/ /* S3 */
-        } else {
-	    jStreamsControl = VGAIN8( vgaCRReg ) | ENABLE_STREAMS_OLD; /* tim */
-	    /*jStreamsControl = VGAIN8( vgaCRReg ) | 0x04;*/ /* S3 */
-	}
-	/* Wait for VBLANK. */
-	
-	VerticalRetraceWait();
-
-	/* Fire up streams! */
-
-	VGAOUT16( vgaCRIndex, (jStreamsControl << 8) | EXT_MISC_CTRL2 );
-
-	SavageInitStreamsOld( pScrn );
-    }
-
-    /* Wait for VBLANK. */
-    
-    VerticalRetraceWait();
-
-    /* Turn on secondary stream TV flicker filter, once we support TV. */
-
-    /* SR70 |= 0x10 */
-
-    psav->videoFlags |= VF_STREAMS_ON;
-    psav->videoFourCC = id;
-}
-
-void SavageStreamsOff(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    unsigned char jStreamsControl;
-    unsigned short vgaCRIndex = psav->vgaIOBase + 4;
-    unsigned short vgaCRReg = psav->vgaIOBase + 5;
-
-    xf86ErrorFVerb(XVTRACE, "SavageStreamsOff\n" );
-
-    xf86EnableIO();
-
-    /* Unlock extended registers. */
-
-    VGAOUT16(vgaCRIndex, 0x4838);
-    VGAOUT16(vgaCRIndex, 0xa039);
-    VGAOUT16(0x3c4, 0x0608);
-
-    VGAOUT8( vgaCRIndex, EXT_MISC_CTRL2 );
-    if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset)  ||
-        (psav->Chipset == S3_SAVAGE2000) )
-	jStreamsControl = VGAIN8( vgaCRReg ) & NO_STREAMS;
-    else
-	jStreamsControl = VGAIN8( vgaCRReg ) & NO_STREAMS_OLD;
-
-    /* Wait for VBLANK. */
-
-    VerticalRetraceWait();
-
-    /* Kill streams. */
-
-    VGAOUT16( vgaCRIndex, (jStreamsControl << 8) | EXT_MISC_CTRL2 );
-
-    VGAOUT16( vgaCRIndex, 0x0093 );
-    VGAOUT8( vgaCRIndex, 0x92 );
-    VGAOUT8( vgaCRReg, VGAIN8(vgaCRReg) & 0x40 );
-
-    psav->videoFlags &= ~VF_STREAMS_ON;
 }
 
 void SavageInitVideo(ScreenPtr pScreen)
@@ -544,13 +254,13 @@ void SavageInitVideo(ScreenPtr pScreen)
     xf86ErrorFVerb(XVTRACE,"SavageInitVideo\n");
     if(
 	S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
+        (psav->Chipset == S3_SUPERSAVAGE) ||
 	(psav->Chipset == S3_SAVAGE2000)
     )
     {
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
 
-	SavageInitStreams = SavageInitStreamsNew;
 	SavageSetColor = SavageSetColorNew;
 	SavageSetColorKey = SavageSetColorKeyNew;
 	SavageDisplayVideo = SavageDisplayVideoNew;
@@ -561,7 +271,6 @@ void SavageInitVideo(ScreenPtr pScreen)
 	SavageInitOffscreenImages(pScreen);
     /*DELETENEXTLINE*/
 	/* Since newAdaptor is still NULL, these are still disabled for now. */
-	SavageInitStreams = SavageInitStreamsOld;
 	SavageSetColor = SavageSetColorOld;
 	SavageSetColorKey = SavageSetColorKeyOld;
 	SavageDisplayVideo = SavageDisplayVideoOld;
@@ -594,9 +303,6 @@ void SavageInitVideo(ScreenPtr pScreen)
 
     if( newAdaptor )
     {
-	if( SavageInitStreams == SavageInitStreamsNew )
-	    SavageInitStreams(pScrn);
-	psav->videoFlags = 0;
 	psav->videoFourCC = 0;
     }
 }
@@ -709,7 +415,7 @@ void SavageSetColorOld( ScrnInfoPtr pScrn )
     SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
 
     xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
-	pPriv->brightness, pPriv->contrast, pPriv->saturation, pPriv->hue );
+	pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
 
     if( 
 	(psav->videoFourCC == FOURCC_RV15) ||
@@ -751,7 +457,7 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     unsigned long assembly;
 
     xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
-	pPriv->brightness, pPriv->contrast, pPriv->saturation, pPriv->hue );
+	pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
 
     if( psav->videoFourCC == FOURCC_Y211 )
 	k = 1.0;	/* YUV */
@@ -779,20 +485,20 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     k2 = (int)(dk2+0.5) & 0x1ff;
     k3 = (int)(dk3+0.5) & 0x1ff;
     assembly = (k3<<18) | (k2<<9) | k1;
-    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08x  ", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08lx  ", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT1, assembly );
 
     k4 = (int)(dk4+0.5) & 0x1ff;
     k5 = (int)(dk5+0.5) & 0x1ff;
     k6 = (int)(dk6+0.5) & 0x1ff;
     assembly = (k6<<18) | (k5<<9) | k4;
-    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08x  ", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08lx  ", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT2, assembly );
 
     k7 = (int)(dk7+0.5) & 0x1ff;
     kb = (int)(dkb+0.5) & 0xffff;
     assembly = (kb<<9) | k7;
-    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08x\n", assembly );
+    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08lx\n", assembly );
     OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly );
 }
 
@@ -873,14 +579,14 @@ SavageSetupImageVideo(ScreenPtr pScreen)
     pPriv->lastKnownPitch = 0;
 
     /* gotta uninit this someplace */
-    REGION_INIT(pScreen, &pPriv->clip, NullBox, 0); 
+    REGION_NULL(pScreen, &pPriv->clip);
 
     psav->adaptor = adapt;
 
-    #if 0
+#if 0
     psav->BlockHandler = pScreen->BlockHandler;
     pScreen->BlockHandler = SavageBlockHandler;
-    #endif
+#endif
 
     return adapt;
 }
@@ -971,7 +677,8 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
     REGION_EMPTY(pScrn->pScreen, &pPriv->clip);   
 
     if(shutdown) {
-	SavageStreamsOff( pScrn );
+	SavageClipVWindow(pScrn);
+/* 	SavageStreamsOff( pScrn ); */
 	if(pPriv->area) {
 	    xf86FreeOffscreenArea(pPriv->area);
 	    pPriv->area = NULL;
@@ -1083,89 +790,6 @@ SavageQueryBestSize(
     if(*p_w > 16384) *p_w = 16384;
 }
 
-/* SavageCopyPlanarDataBCI() causes artifacts on the screen when used on savage4. 
- * It's probably something with the BCI.  Maybe we need a waitforidle() or
- * something...
- */
-static void
-SavageCopyPlanarDataBCI(
-    ScrnInfoPtr pScrn,
-    unsigned char *srcY, /* Y */
-    unsigned char *srcV, /* V */
-    unsigned char *srcU, /* U */
-    unsigned char *dst,
-    int srcPitch, int srcPitch2,
-    int dstPitch,
-    int h,int w)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    /* half of the dest buffer for copying the YVU data to it ??? */
-    unsigned char *dstCopy = (unsigned char *)(((unsigned long)dst
-                                                + 2 * srcPitch * h
-                                                + 0x0f) & ~0x0f);
-    /* for pixel transfer */
-    unsigned long offsetY = (unsigned long)dstCopy - (unsigned long)psav->FBBase;
-    unsigned long offsetV = offsetY +  srcPitch * h;
-    unsigned long offsetU = offsetV +  srcPitch2 * (h>>1);
-    unsigned long dstOffset  = (unsigned long)dst - (unsigned long)psav->FBBase;
-    int i;
-    
-    BCI_GET_PTR;
-
-    /* copy Y planar */
-    for (i=0;i<srcPitch * h;i++) {
-        dstCopy[i] = srcY[i];
-    }
-
-    /* copy V planar */    
-    dstCopy = dstCopy + srcPitch * h;
-    for (i=0;i<srcPitch2 * (h>>1);i++) {
-        dstCopy[i] = srcV[i];
-    }
-
-    /* copy U planar */
-    dstCopy = dstCopy + srcPitch2 * (h>>1);    
-    for (i=0;i<srcPitch2 * (h>>1);i++) {
-        dstCopy[i] = srcU[i];        
-    }
-
-    /*
-     * Transfer pixel data from one memory location to another location
-     * and reformat the data during the transfer
-     * a. program BCI51 to specify the source information
-     * b. program BCI52 to specify the destination information
-     * c. program BCI53 to specify the source dimensions 
-     * d. program BCI54 to specify the destination dimensions
-     * e. (if the data is in YCbCr420 format)program BCI55,BCI56,BCI57 to
-     *    locations of the Y,Cb,and Cr data
-     * f. program BCI50(command=011) to specify the formatting options and
-     *    kick off the transfer
-     * this command can be used for color space conversion(YCbCr to RGB)
-     * or for oversampling, but not for both simultaneously. it can also be
-     * used to do mastered image transfer when the source is tiled
-     */
-
-    w = (w+0xf)&0xff0;
-    psav->WaitQueue(psav,11);
-    BCI_SEND(0x96070051);
-    BCI_SEND(offsetY);
-
-    BCI_SEND(dstOffset);
-
-    BCI_SEND(((h-1)<<16)|((w-1)>>3));
-
-    BCI_SEND(dstPitch >> 3);
-
-
-    BCI_SEND(offsetU);
-    BCI_SEND(offsetV);
-
-    BCI_SEND((srcPitch2 << 16)| srcPitch2);
-
-    BCI_SEND(0x96010050);
-    BCI_SEND(0x00200003 | srcPitch);
-    BCI_SEND(0xC0170000);
-}
 
 static void
 SavageCopyData(
@@ -1265,6 +889,22 @@ SavageAllocateMemory(
 }
 
 static void
+SavageSetBlend(ScrnInfoPtr pScrn, int id)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+
+    if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
+        (psav->Chipset == S3_SUPERSAVAGE) ||
+        (psav->Chipset == S3_SAVAGE2000) )
+    {
+	psav->blendBase = GetBlendForFourCC( id ) << 9;
+	xf86ErrorFVerb(XVTRACE+1,"Format %4.4s, blend is %08x\n", (char*)&id, psav->blendBase );
+	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
+    }
+    psav->videoFourCC = id;
+}
+
+static void
 SavageDisplayVideoOld(
     ScrnInfoPtr pScrn,
     int id,
@@ -1281,39 +921,22 @@ SavageDisplayVideoOld(
     SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
     /*DisplayModePtr mode = pScrn->currentMode;*/
     int vgaCRIndex, vgaCRReg, vgaIOBase;
-    unsigned int ssControl;
-    int scalratio;
+    CARD32 ssControl;
 
 
     vgaIOBase = hwp->IOBase;
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
 
-    if( psav->videoFourCC != id )
-	SavageStreamsOff(pScrn);
-
-    if( !psav->videoFlags & VF_STREAMS_ON )
-    {
-	SavageStreamsOn(pScrn, id);
+    if ( psav->videoFourCC != id ) {
+	SavageSetBlend(pScrn,id);
 	SavageResetVideo(pScrn);
     }
 
-    /* Calculate horizontal scale factor. */
-    if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
-        && psav->FPExpansion) {
-        drw_w = (((float)(drw_w * psav->XExp1)/(float)psav->XExp2)+1);
-        drw_h = (float)(drw_h * psav->YExp1)/(float)psav->YExp2+1;
-        dstBox->x1 = (float)(dstBox->x1 * psav->XExp1)/(float)psav->XExp2;
-        dstBox->y1 = (float)(dstBox->y1 * psav->YExp1)/(float)psav->YExp2;
-
-        dstBox->x1 += psav->displayXoffset;
-        dstBox->y1 += psav->displayYoffset;
-    }
-
     /* Set surface format. */
-
-    OUTREG(SSTREAM_CONTROL_REG, 
-	(GetBlendForFourCC(psav->videoFourCC) << 24) + src_w );
+    ssControl = (GetBlendForFourCC(psav->videoFourCC) << 24) | src_w;
+    
+    OUTREG(SSTREAM_CONTROL_REG, ssControl);
 
     /* Calculate horizontal scale factor. */
 
@@ -1321,73 +944,36 @@ SavageDisplayVideoOld(
 
     /* Calculate vertical scale factor. */
 
-    /*
-     * MM81E8:Secondary Stream Source Line Count
-     *   bit_0~10: # of lines in the source image (before scaling)
-     *   bit_15 = 1: Enable vertical interpolation
-     *            0: Line duplicaion
-     */
-    OUTREG(SSTREAM_LINES_REG, 0x00008000 | src_h );
+    OUTREG(SSTREAM_LINES_REG, src_h );
     OUTREG(SSTREAM_VINITIAL_REG, 0 );
-    /*OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );*/
-    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));
+    OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );
 
     /* Set surface location and stride. */
 
-    OUTREG(SSTREAM_FBADDR0_REG, (offset + (x1>>15)) & 0x3ffff0 );
-    OUTREG(SSTREAM_FBADDR1_REG, 0 );
-    
+    OUTREG(SSTREAM_FBADDR0_REG, (offset + (x1>>15)) & (0x1ffffff & ~BASE_PAD) );
     OUTREG(SSTREAM_STRIDE_REG, pitch & 0xfff );
 
     OUTREG(SSTREAM_WINDOW_START_REG, OS_XY(dstBox->x1, dstBox->y1) );
-    OUTREG(SSTREAM_WINDOW_SIZE_REG, OS_WH(drw_w, drw_h) );
+    OUTREG(SSTREAM_WINDOW_SIZE_REG, OS_WH(dstBox->x2-dstBox->x1,
+					  dstBox->y2-dstBox->y1));
 
-    /*
-     * Process horizontal scaling
-     *  upscaling and downscaling smaller than 2:1 controled by MM8198
-     *  MM8190 controls downscaling mode larger than 2:1
-     */
-    scalratio = 0;
-    ssControl = 0;
-#if 0
     if( src_w > (drw_w << 1) )
     {
-	/* BUGBUG shouldn't this be >=?  */
 	if( src_w <= (drw_w << 2) )
 	    ssControl |= HDSCALE_4;
-	else if( src_w > (drw_w << 3) )
+	else if( src_w <= (drw_w << 3) )
 	    ssControl |= HDSCALE_8;
-	else if( src_w > (drw_w << 4) )
+	else if( src_w <= (drw_w << 4) )
 	    ssControl |= HDSCALE_16;
-	else if( src_w > (drw_w << 5) )
+	else if( src_w <= (drw_w << 5) )
 	    ssControl |= HDSCALE_32;
-	else if( src_w > (drw_w << 6) )
+	else if( src_w <= (drw_w << 6) )
 	    ssControl |= HDSCALE_64;
     }
-#endif
-    if (src_w >= (drw_w * 2)) {
-        if (src_w < (drw_w * 4)) {
-            scalratio = HSCALING(2,1);
-        } else if (src_w < (drw_w * 8)) {
-            ssControl |= HDSCALE_4;
-        } else if (src_w < (drw_w * 16)) {
-            ssControl |= HDSCALE_8;
-        } else if (src_w < (drw_w * 32)) {
-            ssControl |= HDSCALE_16;
-        }  else if (src_w < (drw_w * 64)) {
-            ssControl |= HDSCALE_32;
-        } else
-            ssControl |= HDSCALE_64;
-    } else
-        scalratio = HSCALING(src_w,drw_w);
 
     ssControl |= src_w;
     ssControl |= (1 << 24);
-    /* Wait for VBLANK. */
-    VerticalRetraceWait();
     OUTREG(SSTREAM_CONTROL_REG, ssControl);
-    if (scalratio)
-        OUTREG(SSTREAM_STRETCH_REG,scalratio);
 
 #if 0
     /* Set color key on primary. */
@@ -1410,7 +996,7 @@ SavageDisplayVideoOld(
 	VGAOUT8(vgaCRIndex, 0x93);
 	VGAOUT8(vgaCRReg, pitch);
     }
-
+    OUTREG(STREAMS_FIFO_REG, 0x2 | 25 << 5 | 32 << 11);
 }
 
 static void
@@ -1436,12 +1022,8 @@ SavageDisplayVideoNew(
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
 
-    if( psav->videoFourCC != id )
-	SavageStreamsOff(pScrn);
-
-    if( !psav->videoFlags & VF_STREAMS_ON )
-    {
-	SavageStreamsOn(pScrn, id);
+    if ( psav->videoFourCC != id ) {
+	SavageSetBlend(pScrn,id);
 	SavageResetVideo(pScrn);
     }
 
@@ -1486,10 +1068,12 @@ SavageDisplayVideoNew(
      * are 2 bytes/pixel.
      */
 
-    OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) & 0x7ffff0 );
+    OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) 
+	   & (0x7ffffff & ~BASE_PAD));
     OUTREG(SEC_STREAM_STRIDE, pitch & 0xfff );
     OUTREG(SEC_STREAM_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
-    OUTREG(SEC_STREAM_WINDOW_SZ, ((drw_w) << 16) | drw_h );
+    OUTREG(SEC_STREAM_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+	   | (dstBox->x2-dstBox->x1) );
 
 #if 0
     /* Set color key on primary. */
@@ -1527,6 +1111,7 @@ SavagePutImage(
 ){
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
     SavagePtr psav = SAVPTR(pScrn);
+    ScreenPtr pScreen = pScrn->pScreen;
     INT32 x1, x2, y1, y2;
     unsigned char *dst_start;
     int pitch, new_h, offset, offsetV=0, offsetU=0;
@@ -1535,20 +1120,6 @@ SavagePutImage(
     BoxRec dstBox;
     CARD32 tmp;
 /*    xf86ErrorFVerb(XVTRACE,"SavagePutImage\n"); */
-
-    if( psav->cxScreen != pScrn->currentMode->HDisplay )
-    {
-	/* The mode has changed.  Recompute the offsets. */
-
-	if( 
-	    S3_SAVAGE_MOBILE_SERIES(psav->Chipset) && 
-	    !psav->CrtOnly && 
-	    !psav->TvOn 
-	) {
-	    OverlayParamInit( pScrn );
-	}
-    }
-
     if(drw_w > 16384) drw_w = 16384;
 
     /* Clip */
@@ -1616,8 +1187,8 @@ SavagePutImage(
     npixels = ((((x2 + 0xffff) >> 16) + 1) & ~1) - left;
     left <<= 1;
 
-    offset = (pPriv->area->box.y1 * pitch) + (top * dstPitch);
-    dst_start = psav->FBBase + offset + left;
+    offset = ((pPriv->area->box.y1 * pitch)) + (top * dstPitch);
+    dst_start = (psav->FBBase + ((offset + left) & ~BASE_PAD));
 
     switch(id) {
     case FOURCC_YV12:		/* YV12 */
@@ -1625,23 +1196,13 @@ SavagePutImage(
 	top &= ~1;
 	tmp = ((top >> 1) * srcPitch2) + (left >> 2);
 	offsetU += tmp;
-	offsetV += tmp;
+	offsetV += tmp; 
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
-        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv 
-	    /*&& (!psav->disableCOB)*/) {
-            SavageCopyPlanarDataBCI(
-                pScrn,
-	    	buf + (top * srcPitch) + (left >> 1), 
-	    	buf + offsetV, 
-	    	buf + offsetU, 
-	    	dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
-        } else {
-	    SavageCopyPlanarData(
-	    	buf + (top * srcPitch) + (left >> 1), 
-	    	buf + offsetV, 
-	    	buf + offsetU, 
-	    	dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
-        }
+	SavageCopyPlanarData(
+	    buf + (top * srcPitch) + (left >> 1), 
+	    buf + offsetV, 
+	    buf + offsetU, 
+	    dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
 	break;
     case FOURCC_Y211:		/* Y211 */
     case FOURCC_RV15:		/* RGB15 */
@@ -1665,7 +1226,6 @@ SavagePutImage(
 	REGION_COPY(pScreen, &pPriv->clip, clipBoxes);
 	/* draw these */
 	xf86XVFillKeyHelper(pScrn->pScreen, pPriv->colorKey, clipBoxes);
-
     }
 
     pPriv->videoStatus = CLIENT_VIDEO_ON;
@@ -1689,10 +1249,6 @@ SavageQueryImageAttributes(
     if(offsets) offsets[0] = 0;
 
     switch(id) {
-    case FOURCC_IA44:
-        if (pitches) pitches[0]=*w;
-        size=(*w)*(*h);
-        break;
     case FOURCC_Y211:
 	size = *w << 2;
 	if(pitches) pitches[0] = size;
@@ -1724,6 +1280,7 @@ SavageQueryImageAttributes(
 
     return size;
 }
+
 
 /****************** Offscreen stuff ***************/
 
@@ -1791,7 +1348,7 @@ SavageStopSurface(
 
     if(pPriv->isOn) {
 	/*SavagePtr psav = SAVPTR(surface->pScrn);*/
-	SavageStreamsOff( surface->pScrn );
+	SavageClipVWindow(surface->pScrn);
 	pPriv->isOn = FALSE;
     }
 
@@ -1847,6 +1404,7 @@ SavageDisplaySurface(
 ){
     OffscreenPrivPtr pPriv = (OffscreenPrivPtr)surface->devPrivate.ptr;
     ScrnInfoPtr pScrn = surface->pScrn;
+    ScreenPtr pScreen = pScrn->pScreen;
     SavagePortPrivPtr portPriv = GET_PORT_PRIVATE(pScrn);
     INT32 x1, y1, x2, y2;
     BoxRec dstBox;
@@ -1883,7 +1441,7 @@ SavageDisplaySurface(
     pPriv->isOn = TRUE;
 #if 0
     if(portPriv->videoStatus & CLIENT_VIDEO_ON) {
-	REGION_EMPTY(pScrn->pScreen, &portPriv->clip);   
+	REGION_EMPTY(pScreen, &portPriv->clip);
 	UpdateCurrentTime();
 	portPriv->videoStatus = FREE_TIMER;
 	portPriv->freeTime = currentTime.milliseconds + FREE_DELAY;
@@ -1925,144 +1483,3 @@ SavageInitOffscreenImages(ScreenPtr pScreen)
     
     xf86XVRegisterOffscreenImages(pScreen, offscreenImages, 1);
 }
-
-static
-void PatchEnableSPofPanel(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-
-    UnLockExtRegs();
-
-    if (pScrn->bitsPerPixel == 8) {
-        OUTREG8(CRT_ADDRESS_REG,0x90);
-        OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0x40);
-    }
-    else  {
-        OUTREG8(CRT_ADDRESS_REG,0x90);
-        OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0x48);
-    }
-
-    VerticalRetraceWait();
-
-    OUTREG8(CRT_ADDRESS_REG,0x67);
-    OUTREG8(CRT_DATA_REG,(INREG8(CRT_DATA_REG)&0xf3)|0x04);
-
-    OUTREG8(CRT_ADDRESS_REG,0x65);
-    OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0xC0);
-    
-    if (pScrn->bitsPerPixel == 8) {
-        OUTREG32(PSTREAM_CONTROL_REG,0x00000000);
-    } else {
-        OUTREG32(PSTREAM_CONTROL_REG,0x02000000);
-    }
-    OUTREG32(PSTREAM_WINDOW_SIZE_REG, 0x0);
-    
-}
-
-/*
- * Function to get lcd factor, display offset for overlay use
- * Input: pScrn; Output: x,yfactor, displayoffset in pScrn
- */
-static void OverlayTwisterInit(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-
-    psav->cxScreen = psav->iResX;
-    InitStreamsForExpansion(pScrn);
-    PatchEnableSPofPanel(pScrn);
-}
-
-/* Function to get lcd factor, display offset for overlay use
- * Input: pScrn; Output: x,yfactor, displayoffset in pScrn
- */
-static void OverlayParamInit(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-
-    psav = SAVPTR(pScrn);
-    psav->cxScreen = pScrn->currentMode->HDisplay;
-    InitStreamsForExpansion(pScrn);
-}
-
-/* Function to calculate lcd expansion x,y factor and offset for overlay
- */
-static void InitStreamsForExpansion(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    int		PanelSizeX,PanelSizeY;
-    int		ViewPortWidth,ViewPortHeight;
-    int		XExpansion, YExpansion;
-    int		XFactor, YFactor;
-    int		Hstate, Vstate;
-
-    static CARD32 Xfactors[] = {
-	0x00010001,
-	0x00010001, /* 1 */
-	0,
-	0x00090008, /* 3 */
-	0x00050004, /* 4 */
-	0,
-	0x00030002, /* 6 */
-	0x00020001  /* 7 */
-    };
-
-    static CARD32 Yfactors[] = {
-	0x00010001,	0x00010001,
-	0,		0x00060005,
-	0x00050004,	0x00040003,
-	0,		0x00030002,
-	0x00020001,	0x00050002,
-	0x000C0005,	0x00080003,
-	0x00090004,	0,
-	0x00030001,	0x00040001,
-    };
-
-
-
-    PanelSizeX = psav->PanelX;
-    PanelSizeY = psav->PanelY;
-    ViewPortWidth = pScrn->currentMode->HDisplay;
-    ViewPortHeight = pScrn->currentMode->VDisplay;
-
-    if( PanelSizeX == 1408 )
-	PanelSizeX = 1400;
-
-    XExpansion = 0x00010001;
-    YExpansion = 0x00010001;
-
-    psav->displayXoffset = 0;
-    psav->displayYoffset = 0;
-
-    VGAOUT8(0x3C4, HZEXP_COMP_1);
-    Hstate = VGAIN8(0x3C5);
-    VGAOUT8(0x3C4, VTEXP_COMP_1);
-    Vstate = VGAIN8(0x3C5);
-    VGAOUT8(0x3C4, HZEXP_FACTOR_IGA1);
-    XFactor = VGAIN8(0x3C5);
-    VGAOUT8(0x3C4, VTEXP_FACTOR_IGA1);
-    YFactor = VGAIN8(0x3C5);
-
-    if( Hstate & EC1_EXPAND_ON )
-    {
-	XExpansion = Xfactors[XFactor>>4];
-    }
-
-    if( Vstate & EC1_EXPAND_ON )
-    {
-	YExpansion = Yfactors[YFactor>>4];
-    }
-
-    psav->XExp1 = XExpansion >> 16;
-    psav->XExp2 = XExpansion & 0xFFFF;
-
-    psav->YExp1 = YExpansion >> 16;
-    psav->YExp2 = YExpansion & 0xFFFF;
-
-    psav->displayXoffset = 
-       ((PanelSizeX - (psav->XExp1 * ViewPortWidth) / psav->XExp2) / 2 + 7) & 0xfff8;
-    psav->displayYoffset = 
-       ((PanelSizeY - (psav->YExp1 * ViewPortHeight) / psav->YExp2) / 2);
-
-}  /* InitStreamsForExpansionPM */
-
-#endif /* XvExtension */

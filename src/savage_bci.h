@@ -1,44 +1,7 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_bci.h,v 1.2 2001/10/01 13:44:09 eich Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_bci.h,v 1.3 2002/05/14 20:19:51 alanh Exp $ */
 
 #ifndef _S3BCI_H_
 #define _S3BCI_H_
-
-
-/* BCI Control Register */
-#define   S3_BCI_CONTROL                0x816C
-
-/*
- *  High 8 bit of primary bitmap descriptor 2 register.
- *  Bits 25-24: Tile Format  00 = Linear ; 10 = 16 bits; 11 = 32 bits (Savage4)
- *            00 = Linear ; 01 = Tile; 10 = Texture tiling format/ Destination Tiling format      
- *            11 = Reserved/Destination tiling format. 
- */
-
-
-
-#define   TILE_LINEAR                   0
-#define   TILE_FORMAT_LINEAR            0
-#define   TILE_TEXTURE                  2
-#define   TILE_DESTINATION              1
-#define   TILE_FORMAT_DESTINATION16     2
-#define   TILE_FORMAT_DESTINATION32     3
-
-/* BD - BCI enable */
-/* savage4, MX, IX, 3D */
-#define   BCI_ENABLE                    8
-/* twister, prosavage */
-/* not sure which one supersavage fits into */
-#define   BCI_ENABLE_TWISTER            0
-
-#define   S3_BIG_ENDIAN                    4
-#define   S3_LITTLE_ENDIAN                 0
-#define   S3_BD64                          1
-
-
- 
-/*  Global Bitmap Descriptor */
-#define   S3_BCI_GLB_BD_LOW             0x8168
-#define   S3_BCI_GLB_BD_HIGH            0x816C
 
 #define REVERSE_BYTE_ORDER32(dword) {\
     unsigned int temp; \
@@ -47,10 +10,10 @@
     dword |= (temp & 0xFF0000) >> 8; \
     dword |= (temp & 0xFF000000) >> 24; }
 
-#define BCI_GET_PTR volatile unsigned int * bci_ptr = (unsigned int *) psav->BciMem
-#define BCI_RESET bci_ptr = (unsigned int *) psav->BciMem
+#define BCI_GET_PTR volatile CARD32 * bci_ptr = (CARD32 *) psav->BciMem
+#define BCI_RESET bci_ptr = (CARD32 *) psav->BciMem
 
-#define BCI_SEND(dw)   (*bci_ptr++ = (unsigned int)(dw))
+#define BCI_SEND(dw)   (*bci_ptr++ = (CARD32)(dw))
 
 #define BCI_CMD_NOP                  0x40000000
 #define BCI_CMD_RECT                 0x48000000
@@ -108,7 +71,7 @@
 #define BCI_BD_TILE_MASK             0x03000000
 #define BCI_BD_TILE_NONE             0x00000000
 #define BCI_BD_TILE_16               0x02000000
-#define BCI_BD_TILE_32               0x03000000
+#define BCI_BD_TILE_32               0x04000000
 #define BCI_BD_GET_BPP(bd)           (((bd) >> 16) & 0xFF)
 #define BCI_BD_SET_BPP(bd, bpp)      ((bd) |= (((bpp) & 0xFF) << 16))
 #define BCI_BD_GET_STRIDE(bd)        ((bd) & 0xFFFF)

@@ -181,13 +181,11 @@ void SavageSubsequentImageWriteRect
 {
     SavagePtr psav = SAVPTR(pScrn);
     BCI_GET_PTR;
-    int count;
 
-    count = ((w * pScrn->bitsPerPixel + 31) / 32) * h;
-    psav->WaitQueue( psav, count );
+    psav->WaitQueue( psav, 6 );
     BCI_SEND(psav->SavedBciCmd);
     BCI_SEND(BCI_CLIP_LR(x+skipleft, x+w-1));
-    if( psav->SavedBgColor != -1 )
+    if( psav->SavedBgColor != 0xffffffff )
         BCI_SEND(psav->SavedBgColor);
     BCI_SEND(BCI_X_Y(x, y));
     BCI_SEND(BCI_W_H(w, h));

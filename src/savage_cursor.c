@@ -1,4 +1,4 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_cursor.c,v 1.6 2001/11/02 16:24:51 alanh Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_cursor.c,v 1.7 2002/05/14 20:19:51 alanh Exp $ */
 
 /*
  * Hardware cursor support for S3 Savage 4.0 driver. Taken with
@@ -24,9 +24,7 @@ static void SavageSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
 #define outCRReg(reg, val) (VGAHWPTR(pScrn))->writeCrtc( VGAHWPTR(pScrn), reg, val )
 #define inSRReg(reg) (VGAHWPTR(pScrn))->readSeq( VGAHWPTR(pScrn), reg )
 #define outSRReg(reg, val) (VGAHWPTR(pScrn))->writeSeq( VGAHWPTR(pScrn), reg, val )
-#if 0
 #define inStatus1() (VGAHWPTR(pScrn))->readST01( VGAHWPTR(pScrn) )
-#endif
 
 /* 
  * certain HW cursor operations seem 
@@ -41,6 +39,27 @@ static void SavageSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
                       } 
 #define MAX_CURS 64
 
+/*
+ * Disable HW Cursor on stretched LCDs. We don't know how to
+ * detect if display is stretched. Therefore we cannot rescale
+ * the HW cursor position.
+ */
+
+static Bool
+SavageUseHWCursor(ScreenPtr pScr, CursorPtr pCurs)
+{
+    ScrnInfoPtr pScrn = xf86Screens[pScr->myNum];
+    SavagePtr psav = SAVPTR(pScrn);
+
+    if (psav->PanelX != pScrn->currentMode->HDisplay 
+	|| psav->PanelY != pScrn->currentMode->VDisplay) {
+	/* BIT 1 : CRT is active, BIT 2 : LCD is active */
+	unsigned char cr6d = inCRReg( 0x6d );
+	if (cr6d & 0x02)
+	    return FALSE;
+    }
+    return TRUE;
+}
 
 Bool 
 SavageHWCursorInit(ScreenPtr pScreen)
@@ -62,7 +81,7 @@ SavageHWCursorInit(ScreenPtr pScreen)
 		     HARDWARE_CURSOR_AND_SOURCE_WITH_MASK |
 		     HARDWARE_CURSOR_BIT_ORDER_MSBFIRST |
 	             HARDWARE_CURSOR_INVERT_MASK;
-
+#if 0
     /*
      * The /MX family is apparently unique among the Savages, in that
      * the cursor color is always straight RGB.  The rest of the Savages
@@ -75,15 +94,22 @@ SavageHWCursorInit(ScreenPtr pScreen)
 	||
 	S3_SAVAGE_MOBILE_SERIES(psav->Chipset)
       )
-         infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
+	infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
+#endif
+    /* With streams engine the Cursor seems to be ALWAYS TrueColor */
+    infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
 
     infoPtr->SetCursorColors = SavageSetCursorColors;
     infoPtr->SetCursorPosition = SavageSetCursorPosition;
     infoPtr->LoadCursorImage = SavageLoadCursorImage;
     infoPtr->HideCursor = SavageHideCursor;
     infoPtr->ShowCursor = SavageShowCursor;
-    infoPtr->UseHWCursor = NULL;
 
+    if ((S3_SAVAGE_MOBILE_SERIES(psav->Chipset)
+	 || (psav->Chipset == S3_PROSAVAGE)) && !psav->CrtOnly)
+	infoPtr->UseHWCursor = SavageUseHWCursor;
+    else
+	infoPtr->UseHWCursor = NULL;
     if( !psav->CursorKByte )
 	psav->CursorKByte = pScrn->videoRam - 4;
 
@@ -95,8 +121,9 @@ SavageHWCursorInit(ScreenPtr pScreen)
 void
 SavageShowCursor(ScrnInfoPtr pScrn)
 {
-   /* Turn cursor on. */
+    /* Turn cursor on. */
    outCRReg( 0x45, inCRReg(0x45) | 0x01 );
+   SAVPTR(pScrn)->hwc_on = TRUE;
 }
 
 
@@ -104,12 +131,12 @@ void
 SavageHideCursor(ScrnInfoPtr pScrn)
 {
     /* Turn cursor off. */
-
     if( S3_SAVAGE4_SERIES( SAVPTR(pScrn)->Chipset ) )
     {
        waitHSync(5);
     }
     outCRReg( 0x45, inCRReg(0x45) & 0xfe );
+    SAVPTR(pScrn)->hwc_on = FALSE;
 }
 
 static void
@@ -120,8 +147,8 @@ SavageLoadCursorImage(
     SavagePtr psav = SAVPTR(pScrn);
 
     /* Set cursor location in frame buffer.  */
-    outCRReg( 0x4d, (0xff & psav->CursorKByte));
-    outCRReg( 0x4c, (0xff00 & psav->CursorKByte) >> 8);
+    outCRReg( 0x4d, (0xff & (CARD32)psav->CursorKByte));
+    outCRReg( 0x4c, (0xff00 & (CARD32)psav->CursorKByte) >> 8);
 
     /* Upload the cursor image to the frame buffer. */
     memcpy(psav->FBBase + psav->CursorKByte * 1024, src, 1024);
@@ -201,11 +228,14 @@ SavageSetCursorColors(
     bNeedExtra =
         (psav->CursorInfoRec->Flags & HARDWARE_CURSOR_TRUECOLOR_AT_8BPP);
 
-    if(
-        S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-	(pScrn->depth == 24) ||
-	((pScrn->depth == 8) && bNeedExtra)
-    )
+    /* With the streams engine on HW Cursor seems to be 24bpp ALWAYS */
+    if( 1 
+#if 0
+	|| S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
+ 	(pScrn->depth == 24) ||
+ 	((pScrn->depth == 8) && bNeedExtra)
+#endif
+	) 
     {
 	/* Do it straight, full 24 bit color. */
       
@@ -223,6 +253,7 @@ SavageSetCursorColors(
 	outCRReg(0x4b, bg >> 16);
 	return;
     }
+#if 0
     else if( (pScrn->depth == 15) || (pScrn->depth == 16) )
     {
 	if (pScrn->depth == 15) {
@@ -272,4 +303,5 @@ SavageSetCursorColors(
 	outCRReg(0x4b, bg);
 	outCRReg(0x4b, bg);
     }
+#endif
 }
