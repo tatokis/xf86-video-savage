@@ -1062,18 +1062,18 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
         
         ulTmp =  (((pScrn->virtualX + 0x3f) & 0x0000ffc0) >> 6) << 20;
 	if (psav->IsSecondary)
-            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>6));
 	else 
-            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>6));
     }
     else if (pScrn->bitsPerPixel == 32) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile32;/* tile format destination */
         
         ulTmp =  (((pScrn->virtualX + 0x1f) & 0x0000ffe0) >> 5) << 20;        
 	if (psav->IsSecondary)
-            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>6));
 	else 
-            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>6));
     }
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */
