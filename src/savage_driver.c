@@ -3156,6 +3156,19 @@ static int SavageInternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 }
 
 
+static int SavageGetRefresh(DisplayModePtr mode)
+{
+    int refresh = (mode->Clock * 1000) / (mode->HTotal * mode->VTotal);
+    if (mode->Flags & V_INTERLACE)
+	refresh *= 2.0;
+    if (mode->Flags & V_DBLSCAN)
+	refresh /= 2.0;
+    if (mode->VScan > 1)
+	refresh /= mode->VScan;
+    return refresh;
+}
+
+
 static ModeStatus SavageValidMode(int index, DisplayModePtr pMode,
 				  Bool verbose, int flags)
 {
@@ -3184,7 +3197,7 @@ static ModeStatus SavageValidMode(int index, DisplayModePtr pMode,
 	    return MODE_PANEL;
 
     if (psav->UseBIOS) {
-        refresh = (pMode->Clock * 1000) / (pMode->HTotal * pMode->VTotal);
+	refresh = SavageGetRefresh(pMode);
         return (SavageMatchBiosMode(pScrn,pMode->HDisplay,
                                    pMode->VDisplay,
                                    refresh,NULL,NULL));
@@ -3233,7 +3246,7 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 #endif
 
     if (psav->IsSecondary) {
-        refresh = (mode->Clock * 1000) / (mode->HTotal * mode->VTotal);
+	refresh = SavageGetRefresh(mode);
 
         SavageMatchBiosMode(pScrn,mode->HDisplay,mode->VDisplay,refresh,
                             &newmode,&newrefresh);
@@ -3317,7 +3330,7 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	int refresh;
 	unsigned int newmode=0, newrefresh=0;
 
-        refresh = (mode->Clock * 1000) / (mode->HTotal * mode->VTotal);
+	refresh = SavageGetRefresh(mode);
 
         SavageMatchBiosMode(pScrn,mode->HDisplay,mode->VDisplay,refresh,
                             &newmode,&newrefresh);
