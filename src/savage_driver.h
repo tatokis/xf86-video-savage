@@ -452,6 +452,7 @@ void SavageRefreshArea32(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
 
 void SavageSetTextMode( SavagePtr psav );
 void SavageSetVESAMode( SavagePtr psav, int n, int Refresh );
+void SavageSetPanelEnabled( SavagePtr psav, Bool active );
 void SavageFreeBIOSModeTable( SavagePtr psav, SavageModeTablePtr* ppTable );
 SavageModeTablePtr SavageGetBIOSModeTable( SavagePtr psav, int iDepth );
 

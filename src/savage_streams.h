@@ -71,7 +71,7 @@
 #define SSTREAM_FBSIZE_REG		0x8304
 #define SSTREAM_FBADDR2_REG		0x8308
 
-#define OS_XY(x,y)	(((x+1)<<16)|(y+1))
+#define OS_XY(x,y)	(((x)<<16)|(y+1)) /*(((x+1)<<16)|(y+1))*/
 #define OS_WH(x,y)	(((x-1)<<16)|(y))
 
 /* Streams Processor macros */

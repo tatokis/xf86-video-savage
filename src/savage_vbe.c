@@ -122,6 +122,23 @@ SavageSetVESAMode( SavagePtr psav, int n, int Refresh )
 #endif
 }
 
+void
+SavageSetPanelEnabled( SavagePtr psav, Bool active )
+{
+    int iDevInfo;
+    if( !psav->PanelX )
+	return; /* no panel */
+    iDevInfo = SavageGetDevice( psav );
+    if( active )
+	iDevInfo |= LCD_ACTIVE;
+    else
+	iDevInfo &= ~LCD_ACTIVE;
+    SavageClearVM86Regs( psav->pVbe->pInt10 );
+    psav->pVbe->pInt10->ax = 0x4f14;	/* S3 extensions */
+    psav->pVbe->pInt10->bx = 0x0003;	/* set active devices */
+    psav->pVbe->pInt10->cx = iDevInfo;
+    xf86ExecX86int10( psav->pVbe->pInt10 );
+}
 
 /* Function to get supported device list. */
 

@@ -3823,20 +3823,24 @@ static void SavageDPMS(ScrnInfoPtr pScrn, int mode, int flags)
     }
  
     if ((!psav->CrtOnly) && psav->PanelX) {
-    	switch (mode) {
-	    case DPMSModeOn:
-		VGAOUT8(0x3c4, 0x31); /* SR31 bit 4 - FP enable */
-		VGAOUT8(0x3c5, VGAIN8(0x3c5) | 0x10);
-	        break;
-	    case DPMSModeStandby:
-	    case DPMSModeSuspend:
-	    case DPMSModeOff:
-		VGAOUT8(0x3c4, 0x31); /* SR31 bit 4 - FP enable */
-		VGAOUT8(0x3c5, VGAIN8(0x3c5) & ~0x10);
-	        break;
-	    default:
-	        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Invalid DPMS mode %d\n", mode);
-	        break;
+	if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)) {
+	    SavageSetPanelEnabled(psav, (mode == DPMSModeOn));
+	} else {
+    	    switch (mode) {
+	        case DPMSModeOn:
+		    VGAOUT8(0x3c4, 0x31); /* SR31 bit 4 - FP enable */
+		    VGAOUT8(0x3c5, VGAIN8(0x3c5) | 0x10);
+	            break;
+	        case DPMSModeStandby:
+	        case DPMSModeSuspend:
+	        case DPMSModeOff:
+		    VGAOUT8(0x3c4, 0x31); /* SR31 bit 4 - FP enable */
+		    VGAOUT8(0x3c5, VGAIN8(0x3c5) & ~0x10);
+	            break;
+	        default:
+	            xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Invalid DPMS mode %d\n", mode);
+	            break;
+	    }
         }
     }
 
