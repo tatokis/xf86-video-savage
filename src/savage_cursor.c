@@ -120,11 +120,6 @@ SavageHWCursorInit(ScreenPtr pScreen)
     return xf86InitCursor(pScreen, infoPtr);
 }
 
-/*
- * Supposedly bit 2 of CR45 enables cursor two (rest of the cursor regs are shadowed via SR26), 
- * but I can't seem to enable it. For now it's disabled. - AGD
- */
-
 void
 SavageShowCursor(ScrnInfoPtr pScrn)
 {
@@ -132,7 +127,9 @@ SavageShowCursor(ScrnInfoPtr pScrn)
 
    /* Turn cursor on. */
    if (psav->IsSecondary) {
-       outCRReg( 0x45, inCRReg(0x45) | 0x04 ); /* cursor2 bit 2*/
+       SelectIGA2();
+       outCRReg( 0x45, inCRReg(0x45) | 0x01 );
+       SelectIGA1();
    } else {
        outCRReg( 0x45, inCRReg(0x45) | 0x01 );
    }
@@ -152,7 +149,9 @@ SavageHideCursor(ScrnInfoPtr pScrn)
        waitHSync(5);
     }
     if (psav->IsSecondary) {
-	outCRReg( 0x45, inCRReg(0x45) & 0xfb ); /* cursor2 */
+        SelectIGA2();
+	outCRReg( 0x45, inCRReg(0x45) & 0xfe ); /* cursor2 */
+	SelectIGA1();
     } else {
         outCRReg( 0x45, inCRReg(0x45) & 0xfe );
     }
@@ -198,7 +197,7 @@ SavageSetCursorPosition(
      int y)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    unsigned char xoff, yoff;
+    unsigned char xoff, yoff, byte;
 
     if( S3_SAVAGE4_SERIES( SAVPTR(pScrn)->Chipset ) )
     {
@@ -251,6 +250,11 @@ SavageSetCursorPosition(
         outCRReg( 0x4f, yoff );
         outCRReg( 0x48, (y & 0xff00)>>8 );
     }
+
+    /* fix for HW cursor on crtc2 */
+    byte = inCRReg( 0x46 );
+    outCRReg( 0x46, byte );
+
 }
 
 
@@ -281,8 +285,8 @@ SavageSetCursorColors(
        if (psav->IsSecondary) {
             /* cursor 2 */
 	    /* Reset the cursor color stack pointer */
-	    inCRReg(0x45);
 	    SelectIGA2();
+	    inCRReg(0x45);
 	    /* Write low, mid, high bytes - foreground */
 	    outCRReg(0x4a, fg);
 	    outCRReg(0x4a, fg >> 8);

@@ -1419,12 +1419,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
             psav->HasCRTC2 = FALSE;
     }
 
-    /* until I figure out why cursor2 doesn't work, disable it for crtc2. -- AGD */
-    if (psav->IsSecondary) {
-	psav->hwcursor = FALSE;
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO, "HWCursor currently disabled for crtc2.\n");
-    }
-
     if ((psav->IsSecondary || psav->IsPrimary) && !psav->UseBIOS)
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "BIOS currently required for Dualhead mode setting.\n");
 
@@ -1806,8 +1800,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     i = xf86ValidateModes(pScrn, pScrn->monitor->Modes,
 			  pScrn->display->modes, clockRanges, NULL, 
-			  256, 4095, 16 * pScrn->bitsPerPixel,
-			  128, 4095, 
+			  256, 2048, 16 * pScrn->bitsPerPixel,
+			  128, 2048, 
 			  pScrn->virtualX, pScrn->virtualY,
 			  psav->videoRambytes, LOOKUP_BEST_REFRESH);
 
@@ -3767,6 +3761,18 @@ void SavageLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
     SavagePtr psav = SAVPTR(pScrn);
     int i, index;
     int updateKey = -1;
+    unsigned char byte;
+
+    /* choose CLUT */
+    if (psav->IsPrimary) {
+        VGAOUT8(0x3c4, 0x47);
+        byte = VGAIN8(0x3c5);
+        VGAOUT8(0x3c5, (byte & ~0x03) | 0x01); /* CLUT 1 */
+    } else if (psav->IsSecondary) {
+        VGAOUT8(0x3c4, 0x47);
+        byte = VGAIN8(0x3c5);
+        VGAOUT8(0x3c5, (byte & ~0x03) | 0x02); /* CLUT 2 */
+    }
     
     for (i=0; i<numColors; i++) {
 	index = indicies[i];
@@ -3776,6 +3782,13 @@ void SavageLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
 	VGAOUT8(0x3c9, colors[index].green);
 	VGAOUT8(0x3c9, colors[index].blue);
     }
+
+    /* restore saved CLUT index value */
+    if (psav->IsPrimary || psav->IsSecondary) {
+        VGAOUT8(0x3c4, 0x47);
+        VGAOUT8(0x3c5, byte);
+    }
+
     if (updateKey != -1)
 	SavageUpdateKey(pScrn, colors[updateKey].red, colors[updateKey].green,
 			colors[updateKey].blue);
