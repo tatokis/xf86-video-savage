@@ -1144,7 +1144,6 @@ SavageDisplayVideoOld(
 	SavageResetVideo(pScrn);
     }
 
-    /* Calculate horizontal scale factor. */
     if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
         && psav->FPExpansion) {
         drw_w = (((float)(drw_w * psav->XExp1)/(float)psav->XExp2)+1);
@@ -1156,37 +1155,6 @@ SavageDisplayVideoOld(
         dstBox->y1 += psav->displayYoffset;
     }
 
-    /* Set surface format. */
-    ssControl = (GetBlendForFourCC(psav->videoFourCC) << 24) | src_w;
-    
-    OUTREG(SSTREAM_CONTROL_REG, ssControl);
-
-    /* Calculate horizontal scale factor. */
-
-    OUTREG(SSTREAM_STRETCH_REG, (src_w << 15) / drw_w );
-
-    /* Calculate vertical scale factor. */
-
-    /*
-     * MM81E8:Secondary Stream Source Line Count
-     *   bit_0~10: # of lines in the source image (before scaling)
-     *   bit_15 = 1: Enable vertical interpolation
-     *            0: Line duplicaion
-     */
-    OUTREG(SSTREAM_LINES_REG, 0x00008000 | src_h );
-    OUTREG(SSTREAM_VINITIAL_REG, 0 );
-    /*OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );*/
-    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));
-
-    /* Set surface location and stride. */
-
-    OUTREG(SSTREAM_FBADDR0_REG, (offset + (x1>>15)) & (0x1ffffff & ~BASE_PAD) );
-    OUTREG(SSTREAM_STRIDE_REG, pitch & 0xfff );
-
-    OUTREG(SSTREAM_WINDOW_START_REG, OS_XY(dstBox->x1, dstBox->y1) );
-    OUTREG(SSTREAM_WINDOW_SIZE_REG, OS_WH(dstBox->x2-dstBox->x1,
-					  dstBox->y2-dstBox->y1));
-
     /*
      * Process horizontal scaling
      *  upscaling and downscaling smaller than 2:1 controled by MM8198
@@ -1194,22 +1162,7 @@ SavageDisplayVideoOld(
      */
     scalratio = 0;
     ssControl = 0;
-#if 0
-    if( src_w > (drw_w << 1) )
-    {
-	/* BUGBUG shouldn't this be >=?  */
-	if( src_w <= (drw_w << 2) )
-	    ssControl |= HDSCALE_4;
-	else if( src_w > (drw_w << 3) )
-	    ssControl |= HDSCALE_8;
-	else if( src_w > (drw_w << 4) )
-	    ssControl |= HDSCALE_16;
-	else if( src_w > (drw_w << 5) )
-	    ssControl |= HDSCALE_32;
-	else if( src_w > (drw_w << 6) )
-	    ssControl |= HDSCALE_64;
-    }
-#endif
+
     if (src_w >= (drw_w * 2)) {
         if (src_w < (drw_w * 4)) {
             scalratio = HSCALING(2,1);
@@ -1223,16 +1176,38 @@ SavageDisplayVideoOld(
             ssControl |= HDSCALE_32;
         } else
             ssControl |= HDSCALE_64;
-    } else
+    } else 
         scalratio = HSCALING(src_w,drw_w);
 
     ssControl |= src_w;
-    ssControl |= (1 << 24);
+    /*ssControl |= (1 << 24);*/
+    ssControl |= (GetBlendForFourCC(psav->videoFourCC) << 24);
     /* Wait for VBLANK. */
     VerticalRetraceWait();
     OUTREG(SSTREAM_CONTROL_REG, ssControl);
     if (scalratio)
         OUTREG(SSTREAM_STRETCH_REG,scalratio);
+
+    /* Calculate vertical scale factor. */
+    OUTREG(SSTREAM_VINITIAL_REG, 0 );
+    /*OUTREG(SSTREAM_VSCALE_REG, (src_h << 15) / drw_h );*/
+    OUTREG(SSTREAM_VSCALE_REG, VSCALING(src_h,drw_h));                                                                                  
+    /* Set surface location and stride. */
+    OUTREG(SSTREAM_FBADDR0_REG, (offset + (x1>>15)) & (0x1ffffff & ~BASE_PAD) );
+    OUTREG(SSTREAM_FBADDR1_REG, 0);
+    OUTREG(SSTREAM_STRIDE_REG, pitch & 0xfff );
+                                                                             
+    OUTREG(SSTREAM_WINDOW_START_REG, OS_XY(dstBox->x1, dstBox->y1) );
+    OUTREG(SSTREAM_WINDOW_SIZE_REG, OS_WH(dstBox->x2-dstBox->x1,
+                                          dstBox->y2-dstBox->y1));
+
+    /*
+     * MM81E8:Secondary Stream Source Line Count
+     *   bit_0~10: # of lines in the source image (before scaling)
+     *   bit_15 = 1: Enable vertical interpolation
+     *            0: Line duplicaion
+     */
+    OUTREG(SSTREAM_LINES_REG, 0x00008000 | src_h );
 
 #if 0
     /* Set color key on primary. */
@@ -1255,7 +1230,6 @@ SavageDisplayVideoOld(
 	VGAOUT8(vgaCRIndex, 0x93);
 	VGAOUT8(vgaCRReg, pitch);
     }
-    OUTREG(STREAMS_FIFO_REG, 0x2 | 25 << 5 | 32 << 11);
 }
 
 static void

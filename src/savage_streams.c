@@ -130,12 +130,13 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
 
     xf86ErrorFVerb(STREAMS_TRACE, "SavageInitStreams\n" );
 
-
     if (psav->FBStart2nd) {
 	unsigned long jDelta = pScrn->displayWidth;
 	format = 0 << 24;
 	OUTREG( PSTREAM_STRIDE_REG, jDelta );
 	OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );
+        OUTREG( PSTREAM_FBADDR0_REG, pScrn->fbOffset );
+        OUTREG( PSTREAM_FBADDR1_REG, 0 );
     } else {
 	/*jDelta = pScrn->displayWidth * (pScrn->bitsPerPixel + 7) / 8;*/
 	switch( pScrn->depth ) {
@@ -150,8 +151,8 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
     
     OUTREG( PSTREAM_WINDOW_START_REG, OS_XY(0,0) );
     OUTREG( PSTREAM_WINDOW_SIZE_REG, OS_WH(pScrn->displayWidth, pScrn->virtualY) );
-    OUTREG( PSTREAM_FBADDR0_REG, pScrn->fbOffset );
-    OUTREG( PSTREAM_FBADDR1_REG, 0 );
+/*    OUTREG( PSTREAM_FBADDR0_REG, pScrn->fbOffset );
+    OUTREG( PSTREAM_FBADDR1_REG, 0 ); */
     /*OUTREG( PSTREAM_STRIDE_REG, jDelta );*/
     OUTREG( PSTREAM_CONTROL_REG, format );
     /*OUTREG( PSTREAM_FBSIZE_REG, jDelta * pScrn->virtualY >> 3 );*/
@@ -166,35 +167,17 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
     OUTREG( SSTREAM_FBADDR0_REG, 0 );
     OUTREG( SSTREAM_FBADDR1_REG, 0 );
     OUTREG( SSTREAM_FBADDR2_REG, 0 );
-/*    OUTREG( SSTREAM_FBSIZE_REG, 0 ); */
+    OUTREG( SSTREAM_FBSIZE_REG, 0 );
     OUTREG( SSTREAM_STRIDE_REG, 0 );
     OUTREG( SSTREAM_VSCALE_REG, 0 );
     OUTREG( SSTREAM_LINES_REG, 0 );
     OUTREG( SSTREAM_VINITIAL_REG, 0 );
     OUTREG( SSTREAM_WINDOW_START_REG, OS_XY(0xfffe, 0xfffe) );
     OUTREG( SSTREAM_WINDOW_SIZE_REG, OS_WH(10,2) );
-    OUTREG(STREAMS_FIFO_REG, 2 | 25 << 5 | 32 << 11);
 
     if (S3_MOBILE_TWISTER_SERIES(psav->Chipset) &&
         psav->FPExpansion) {
         OverlayTwisterInit(pScrn);
-    }
-
-    {
-	vgaHWPtr hwp;
-	unsigned short vgaIOBase, vgaCRIndex, vgaCRReg;
-	unsigned char cr90;
-
-	hwp = VGAHWPTR(pScrn);
-	
-	vgaHWGetIOBase(hwp);
-	vgaIOBase = hwp->IOBase;
-	vgaCRIndex = vgaIOBase + 4;
-	vgaCRReg = vgaIOBase + 5;
-
-	VGAOUT8(vgaCRIndex, 0x90);
-	cr90 = VGAIN8(vgaCRReg);
-	VGAOUT8(vgaCRReg, (cr90 & 0x7F));
     }
 }
 
