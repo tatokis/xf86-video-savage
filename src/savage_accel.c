@@ -426,7 +426,7 @@ SavageSetGBD(ScrnInfoPtr pScrn)
         psav->bTiled = TRUE;        
         psav->lDelta = ((psav->lDelta + 127) >> 7) << 7;
             
-        if (psav->Chipset == S3_SAVAGE_MX)
+        if (S3_SAVAGE3D_SERIES(psav->Chipset))
             psav->ulAperturePitch = 0x2000;
 	else if (psav->Chipset == S3_SAVAGE2000)
 	    psav->ulAperturePitch = GetTileAperturePitch2000(pScrn->virtualX,
@@ -773,13 +773,13 @@ void SavageSetGBD_3D(ScrnInfoPtr pScrn)
     else if (pScrn->bitsPerPixel == 16) {
 	psav->GlobalBD.bd1.HighPart.ResBWTile = tile16; /* 16 bpp/destination tiling format */
         
-        ulTmp = (((pScrn->virtualX + 0x3F) & 0x0000FFC0) >> 6) << 20;
+        ulTmp = (((pScrn->virtualX + 0x3F) & 0x0000FFC0) >> 6) << 24;
         OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16);
     }
     else if (pScrn->bitsPerPixel == 32) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile32; /* 32 bpp/destination tiling format */
         
-        ulTmp = ( ((pScrn->virtualX + 0x1F) & 0x0000FFE0) >> 5) << 20;
+        ulTmp = ( ((pScrn->virtualX + 0x1F) & 0x0000FFE0) >> 5) << 24;
         OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32);
     }
 
