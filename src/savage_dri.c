@@ -670,7 +670,11 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
        psav->ShadowStatus = TRUE;
        xf86DrvMsg( pScreen->myNum, X_INFO,
 		   "[drm] Enabling ShadowStatus for DRI.\n" );
+   }
 
+   /* If shadow status is manually or automatically enabled, use a
+    * page in system memory. */
+   if ( psav->ShadowStatus ) {
        pSAVAGEDRIServer->status.size = 4096; /* 1 page */
 
        if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
