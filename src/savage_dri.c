@@ -431,24 +431,6 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
    pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size; /* ? */
 
-   offset = 0;
-
-   if ( psav->AgpDMA ) {
-       if ( psav->CommandDMA ) {
-	   pSAVAGEDRIServer->cmdDma.offset = offset;
-	   pSAVAGEDRIServer->cmdDma.size = SAVAGE_CMDDMA_SIZE;
-	   offset += pSAVAGEDRIServer->cmdDma.size;
-       } else if ( psav->VertexDMA ) {
-	   pSAVAGEDRIServer->buffers.offset = 0;
-	   pSAVAGEDRIServer->buffers.size = SAVAGE_NUM_BUFFERS * SAVAGE_BUFFER_SIZE;
-	   offset += pSAVAGEDRIServer->buffers.size;
-       }
-   }
-
-   pSAVAGEDRIServer->agpTextures.offset = offset;
-   pSAVAGEDRIServer->agpTextures.size = (pSAVAGEDRIServer->agp.size - offset);
-   offset += pSAVAGEDRIServer->agpTextures.size;
-
    if ( drmAgpAcquire( psav->drmFD ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not available\n" );
       return FALSE;
@@ -481,6 +463,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    if ( drmAgpEnable( psav->drmFD, mode ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not enabled\n" );
       drmAgpRelease( psav->drmFD );
+      pSAVAGEDRIServer->agp.handle = 0; /* indicate that AGP init failed */
       return FALSE;
    }
 
@@ -489,6 +472,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    if ( ret < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] Out of memory (%d)\n", ret );
       drmAgpRelease( psav->drmFD );
+      pSAVAGEDRIServer->agp.handle = 0; /* indicate that AGP init failed */
       return FALSE;
    }
    xf86DrvMsg( pScreen->myNum, X_INFO,
@@ -499,8 +483,35 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] Could not bind memory\n" );
       drmAgpFree( psav->drmFD, pSAVAGEDRIServer->agp.handle );
       drmAgpRelease( psav->drmFD );
+      pSAVAGEDRIServer->agp.handle = 0; /* indicate that AGP init failed */
       return FALSE;
    }
+
+   /* AGP initialization failures above are not fatal, we can fall
+    * back to PCI mode. Failures while adding AGP mappings below are
+    * fatal though. DRI must be disabled in that case.
+    * pSAVAGEDRIServer->agp.handle can be used to distinguish these
+    * two cases.
+    */
+
+   /* AGP memory layout
+    */
+   offset = 0;
+
+   if ( psav->AgpDMA ) {
+       if ( psav->CommandDMA ) {
+	   pSAVAGEDRIServer->cmdDma.offset = offset;
+	   pSAVAGEDRIServer->cmdDma.size = SAVAGE_CMDDMA_SIZE;
+	   offset += pSAVAGEDRIServer->cmdDma.size;
+       } else if ( psav->VertexDMA ) {
+	   pSAVAGEDRIServer->buffers.offset = 0;
+	   pSAVAGEDRIServer->buffers.size = SAVAGE_NUM_BUFFERS * SAVAGE_BUFFER_SIZE;
+	   offset += pSAVAGEDRIServer->buffers.size;
+       }
+   }
+
+   pSAVAGEDRIServer->agpTextures.offset = offset;
+   pSAVAGEDRIServer->agpTextures.size = (pSAVAGEDRIServer->agp.size - offset);
 
    /* DMA buffers
     */
@@ -984,10 +995,12 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    }
 
    if ( !psav->IsPCI && !SAVAGEDRIAgpInit( pScreen ) ) {
-       /*
-       SAVAGEDRICloseScreen( pScreen );
-       return FALSE;
-       */
+       if (pSAVAGEDRIServer->agp.handle != 0) {
+	   /* AGP initialization succeeded, but adding AGP mappings failed. */
+	   SAVAGEDRICloseScreen( pScreen );
+	   return FALSE;
+       }
+       /* AGP initialization failed, fall back to PCI mode. */
        psav->IsPCI = TRUE;
        psav->AgpDMA = FALSE;
        xf86DrvMsg( pScrn->scrnIndex, X_WARNING,
@@ -1052,7 +1065,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    pSAVAGEDRI->cpp		= pScrn->bitsPerPixel / 8;
    pSAVAGEDRI->zpp		= pSAVAGEDRI->cpp;
 
-   pSAVAGEDRI->agpMode		= psav->agpMode;
+   pSAVAGEDRI->agpMode		= psav->IsPCI ? 0 : psav->agpMode;
 
    pSAVAGEDRI->bufferSize       = SAVAGE_BUFFER_SIZE;
 
