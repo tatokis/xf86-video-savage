@@ -188,11 +188,11 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
                pConfigs[i].auxBuffers		= 0;
                pConfigs[i].level		= 0;
                if ( accum || stencil ) {
-                  pConfigs[i].visualRating	= GLX_SLOW_VISUAL_EXT;
+		  pConfigs[i].visualRating	= GLX_SLOW_CONFIG;
                } else {
-                  pConfigs[i].visualRating	= GLX_NONE_EXT;
+                  pConfigs[i].visualRating	= GLX_NONE;
 	       }
-               pConfigs[i].transparentPixel	= 0;
+               pConfigs[i].transparentPixel	= GLX_NONE;
                pConfigs[i].transparentRed	= 0;
                pConfigs[i].transparentGreen	= 0;
                pConfigs[i].transparentBlue	= 0;
