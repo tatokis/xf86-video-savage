@@ -329,9 +329,10 @@ typedef struct _Savage {
     unsigned int hwmcOffset;
     unsigned int hwmcSize;
 
+    Bool bDisableXvMC;
+
 #endif
 
-    Bool bDisableXvMC;
     Bool disableCOB;
     Bool BCIforXv;
 

@@ -82,7 +82,9 @@ static unsigned int SavageDDC1Read(ScrnInfoPtr pScrn);
 static void SavageProbeDDC(ScrnInfoPtr pScrn, int index);
 static void SavageGetTvMaxSize(SavagePtr psav);
 static Bool SavagePanningCheck(ScrnInfoPtr pScrn);
+#ifdef XF86DRI
 static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn);
+#endif
 static void SavageResetStreams(ScrnInfoPtr pScrn);
 
 extern ScrnInfoPtr gpScrn;
@@ -1113,6 +1115,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
                    "Option: %s Tile Mode and Program it \n",(psav->bDisableTile?"Disable":"Enable"));
     }
+#ifdef XF86DRI
     psav->bDisableXvMC = FALSE; /* if you want to free up more mem for DRI,etc. */
     if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_XVMC, &psav->bDisableXvMC)) {
         xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
@@ -1122,6 +1125,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	psav->bDisableXvMC = TRUE; /* no xvmc on old savages */
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "No Hardware XvMC support on Savage3D based chips.\n");
     }
+#endif
     psav->disableCOB = FALSE; /* if you are having problems on savage4+ */
     if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_COB, &psav->disableCOB)) {
         xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
@@ -2551,6 +2555,7 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
     return;
 }
 
+#ifdef XF86DRI
 static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
@@ -2591,6 +2596,7 @@ static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 	return FALSE;
     }
 }
+#endif
 
 static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 			     int argc, char **argv)
@@ -2851,12 +2857,14 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 	SavageInitVideo( pScreen );
 #endif
 
+#ifdef XF86DRI
     if ((psav->directRenderingEnabled) && (!psav->bDisableXvMC)) {
         if (SAVAGEInitMC(pScreen))
             xf86DrvMsg(pScrn->scrnIndex,X_CONFIG,"XvMC is enabled\n");
         else
             xf86DrvMsg(pScrn->scrnIndex,X_CONFIG,"XvMC is not enabled\n");
     }
+#endif
 
     if (serverGeneration == 1)
 	xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
