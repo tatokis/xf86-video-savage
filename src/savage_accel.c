@@ -403,20 +403,10 @@ SavageSetGBD(ScrnInfoPtr pScrn)
         psav->lDelta = ((psav->lDelta + 31) >> 5) << 5;
         psav->ulAperturePitch = psav->lDelta;            
     }
-
-    /* if you are using linear mode for 2D, 3D still needs to be tiled, linear AperturePitch/Delta
-       seem to be wrong for savagespan */
-    if (psav->Chipset == S3_SAVAGE_MX || psav->Chipset == S3_SAVAGE3D)
-        psav->ul3DAperturePitch = 0x2000;                            
-    else            
-        psav->ul3DAperturePitch = GetTileAperturePitch(pScrn->virtualX,pScrn->bitsPerPixel);
-
-    psav->l3DDelta = (((pScrn->virtualX * (pScrn->bitsPerPixel >> 3)) + 127) >> 7) << 7;
         
     psav->Bpp = pScrn->bitsPerPixel >> 3;
     psav->cxMemory = psav->lDelta / (psav->Bpp);
     psav->cyMemory = psav->endfb / psav->lDelta - 1;
-    /*psav->cyMemory = (psav->CursorKByte << 10) / (pScrn->displayWidth * (pScrn->bitsPerPixel / 8));*/
     /* ??????????? */
     if (psav->cyMemory > 2048)
         psav->cyMemory = 2048;
@@ -1364,16 +1354,13 @@ SavageInitAccel(ScreenPtr pScreen)
         SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
         BoxRec MemBox;
         int cpp = pScrn->bitsPerPixel / 8;
-        /*int widthBytes = pScrn->displayWidth * cpp;*/
         int widthBytes = psav->lDelta;
-        /*int widthBytes = psav->l3DDelta;*/
         int bufferSize = ((pScrn->virtualY * widthBytes + SAVAGE_BUFFER_ALIGN)
                           & ~SAVAGE_BUFFER_ALIGN);
         int tiledwidthBytes,tiledBufferSize;
 
         pSAVAGEDRIServer->frontbufferSize = bufferSize;
-        /*tiledwidthBytes = psav->lDelta;*/
-        tiledwidthBytes = psav->l3DDelta;
+        tiledwidthBytes = psav->lDelta;
         
         if (cpp == 2) {
             tiledBufferSize = ((pScrn->virtualX+63)/64)*((pScrn->virtualY+15)/16)

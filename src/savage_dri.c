@@ -697,8 +697,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    int size,numbuffer,i;
    savageAgpBufferPtr agpbuffer;
    
-   /* FIXME: Make these configurable...
-    */
+
    /*pSAVAGEDRIServer->agp.size = 16 * 1024 * 1024;*/
    pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
    pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size;
@@ -1295,7 +1294,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    pSAVAGEDRI->frontbuffer		= psav->FrameBufferBase + 
                                           pSAVAGEDRI->frontOffset;
    pSAVAGEDRI->frontPitch		= pSAVAGEDRIServer->frontPitch;
-   pSAVAGEDRI->IsfrontTiled             = psav->bTiled; /* AGD: was 0 */
+   pSAVAGEDRI->IsfrontTiled             = psav->bTiled;
    
    if(pSAVAGEDRI->cpp==2)
        TileStride = (pSAVAGEDRI->width+63)&(~63);
@@ -1307,62 +1306,45 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    else
        zTileStride = (pSAVAGEDRI->width+31)&(~31);
 
-   if(pSAVAGEDRI->IsfrontTiled)
-   {
-      if ((psav->Chipset == S3_TWISTER)
-         || (psav->Chipset == S3_PROSAVAGE)
-         || (psav->Chipset == S3_PROSAVAGEDDR)
-         || (psav->Chipset == S3_SUPERSAVAGE))
-      { 
-      		pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
-                	                          (1<<24) | /* destination tile format */
-                        	                  (pScrn->bitsPerPixel<<16) | /* bpp */
-                        	                  TileStride; /* stride */
-                pSAVAGEDRI->frontPitch          = TileStride;
-      } else {        
-      		pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
-                	                          ((pSAVAGEDRI->cpp==2)?
-                        	                     BCI_BD_TILE_16:BCI_BD_TILE_32) | /*16/32 bpp tile format */
-                        	                  (pScrn->bitsPerPixel<<16) | /* bpp */
-                        	                  TileStride; /* stride */
-      		pSAVAGEDRI->frontPitch 		= TileStride;
-      }
-   }
-   else
-   {
-      pSAVAGEDRI->frontBitmapDesc	= BCI_BD_BW_DISABLE | /* AGD: block write should be disabled:  was 0x00000000 */
-      					  pScrn->bitsPerPixel<<16 |
-      					  pSAVAGEDRI->width;
-   }
-   
-   {
-      if ((psav->Chipset == S3_TWISTER)
-         || (psav->Chipset == S3_PROSAVAGE)
-         || (psav->Chipset == S3_PROSAVAGEDDR)
-         || (psav->Chipset == S3_SUPERSAVAGE))
-      {
-      		pSAVAGEDRI->backBitmapDesc   	= BCI_BD_BW_DISABLE |
-                	                          (1<<24) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          TileStride;
-      		pSAVAGEDRI->depthBitmapDesc   	= BCI_BD_BW_DISABLE |
- 	     					  (1<<24) |
-	                                          (pScrn->bitsPerPixel<<16) |
-	                                          zTileStride;
-      } else {
-      		pSAVAGEDRI->backBitmapDesc   	= BCI_BD_BW_DISABLE |
-                	                          ((pSAVAGEDRI->cpp==2)?
-                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          TileStride;
-	        pSAVAGEDRI->depthBitmapDesc   	= BCI_BD_BW_DISABLE |
-                	                          ((pSAVAGEDRI->zpp==2)?
-                	                             BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                	                          (pScrn->bitsPerPixel<<16) |
-                	                          zTileStride;
-      }
+   if ((psav->Chipset == S3_TWISTER)
+      || (psav->Chipset == S3_PROSAVAGE)
+      || (psav->Chipset == S3_PROSAVAGEDDR)
+      || (psav->Chipset == S3_SUPERSAVAGE)) { 
+      	pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
+                	                  (1<<24) | /* destination tile format */
+                        	          (pScrn->bitsPerPixel<<16) | /* bpp */
+                        	          TileStride; /* stride */
+
+        pSAVAGEDRI->backBitmapDesc      = BCI_BD_BW_DISABLE |
+                                          (1<<24) |
+                                          (pScrn->bitsPerPixel<<16) |
+                                          TileStride;
+
+        pSAVAGEDRI->depthBitmapDesc     = BCI_BD_BW_DISABLE |
+                                          (1<<24) |
+                                          (pScrn->bitsPerPixel<<16) |
+                                          zTileStride;
+    } else {        
+        pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
+                	                  ((pSAVAGEDRI->cpp==2)?
+                        	            BCI_BD_TILE_16:BCI_BD_TILE_32) | /*16/32 bpp tile format */
+                        	          (pScrn->bitsPerPixel<<16) | /* bpp */
+                        	          TileStride; /* stride */
+
+        pSAVAGEDRI->backBitmapDesc      = BCI_BD_BW_DISABLE |
+                                          ((pSAVAGEDRI->cpp==2)?
+                                            BCI_BD_TILE_16:BCI_BD_TILE_32) |
+                                          (pScrn->bitsPerPixel<<16) |
+                                          TileStride;
+
+        pSAVAGEDRI->depthBitmapDesc     = BCI_BD_BW_DISABLE |
+                                          ((pSAVAGEDRI->zpp==2)?
+                                            BCI_BD_TILE_16:BCI_BD_TILE_32) |
+                                          (pScrn->bitsPerPixel<<16) |
+                                          zTileStride;
    }
 
+   pSAVAGEDRI->frontPitch               = TileStride;
    pSAVAGEDRI->backOffset		= pSAVAGEDRIServer->backOffset;
    pSAVAGEDRI->backbufferSize		= pSAVAGEDRIServer->backbufferSize;
    pSAVAGEDRI->backbuffer		= psav->FrameBufferBase +
@@ -1409,8 +1391,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
       if(pSAVAGEDRI->width > 1024)
         shift = 1; 
 
-      /* pSAVAGEDRI->aperturePitch = psav->ulAperturePitch; */
-      pSAVAGEDRI->aperturePitch = psav->ul3DAperturePitch;
+      pSAVAGEDRI->aperturePitch = psav->ulAperturePitch;
    }
 
    {
@@ -1427,10 +1408,10 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 	|| (psav->Chipset == S3_SAVAGE3D)) {
       	    if(pSAVAGEDRI->cpp == 2)
       	    {
-         	value |=  ((psav->l3DDelta / 4) >> 5) << 24;
+         	value |=  ((psav->lDelta / 4) >> 5) << 24;
          	value |= 2<<30;
       	    } else {
-         	value |=  ((psav->l3DDelta / 4) >> 5) << 24;
+         	value |=  ((psav->lDelta / 4) >> 5) << 24;
          	value |= 3<<30;
       	    }
 

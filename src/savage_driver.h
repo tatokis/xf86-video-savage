@@ -350,8 +350,6 @@ typedef struct _Savage {
     int  lDelta;
     int  ulAperturePitch; /* aperture pitch */
 
-    int  l3DDelta; 
-    int  ul3DAperturePitch; /* pitch for 3D */
     /*
      * cxMemory is number of pixels across screen width
      * cyMemory is number of scanlines in available adapter memory.

@@ -2752,12 +2752,11 @@ static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
     int cpp = pScrn->bitsPerPixel / 8;
     /*int widthBytes = pScrn->displayWidth * cpp;*/
     int widthBytes = psav->lDelta;
-    /*int widthBytes = psav->l3DDelta;*/
     int bufferSize = ((pScrn->virtualY * widthBytes + SAVAGE_BUFFER_ALIGN)
                           & ~SAVAGE_BUFFER_ALIGN);
     int tiledwidthBytes, tiledBufferSize, RamNeededFor3D;
-    /*tiledwidthBytes = psav->lDelta;*/
-    tiledwidthBytes = psav->l3DDelta;
+
+    tiledwidthBytes = psav->lDelta;
         
     if (cpp == 2) {
         tiledBufferSize = ((pScrn->virtualX+63)/64)*((pScrn->virtualY+15)/16) * 2048;
@@ -2862,6 +2861,10 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 			"Direct Rendering Disabled -- "
 			"Dual-head configuration is not working with "
 			"DRI at present.\n");
+    } else if (!psav->bTiled) {
+            xf86DrvMsg(scrnIndex, X_WARNING, 
+	    		"Direct Rendering requires a tiled framebuffer -- "
+			"Set Option \"DisableTile\" \"false\"\n");			    
     } else if (((psav->Chipset == S3_TWISTER)
         || (psav->Chipset == S3_PROSAVAGE)
         || (psav->Chipset == S3_SAVAGE4)
