@@ -430,15 +430,6 @@ static XF86ModuleVersionInfo SavageVersRec = {
 
 XF86ModuleData savageModuleData = { &SavageVersRec, SavageSetup, NULL };
 
-static SavageEntPtr SavageEntPriv(ScrnInfoPtr pScrn)
-{
-    DevUnion     *pPriv;
-    SavagePtr  psav   = SAVPTR(pScrn);
-    pPriv = xf86GetEntityPrivate(psav->pEnt->index,
-                                 gSavageEntityIndex);
-    return pPriv->ptr;
-}
-
 static pointer SavageSetup(pointer module, pointer opts, int *errmaj,
 			   int *errmin)
 {
@@ -462,6 +453,15 @@ static pointer SavageSetup(pointer module, pointer opts, int *errmaj,
 }
 
 #endif /* XFree86LOADER */
+
+static SavageEntPtr SavageEntPriv(ScrnInfoPtr pScrn)
+{
+    DevUnion     *pPriv;
+    SavagePtr  psav   = SAVPTR(pScrn);
+    pPriv = xf86GetEntityPrivate(psav->pEnt->index,
+                                 gSavageEntityIndex);
+    return pPriv->ptr;
+}
 
 
 /*
