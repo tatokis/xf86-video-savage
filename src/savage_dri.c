@@ -1446,10 +1446,12 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
          	value |=  (((pSAVAGEDRI->width + 0x1F) & 0xFFE0) >> 5) << 20;
          	value |= 3<<30;
       	    }
-
-	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> 5) ); /* front */
-	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset >> 5) ); /* back  */
-	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset >> 5) ); /* depth */
+	    int offset_shift = 5;
+	    if (psav->Chipset == S3_SUPERSAVAGE) /* supersavages have a different shift */
+		offset_shift = 6;
+	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> offset_shift) ); /* front */
+	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset >> offset_shift) ); /* back  */
+	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset >> offset_shift) ); /* depth */
       }
    }
    
