@@ -1938,7 +1938,7 @@ static void SavageLeaveVT(int scrnIndex, int flags)
         psav->LockHeld = 1;
     }
 #endif
-    if (psav->FBStart2nd)
+    if (psav->FBStart2nd || (psav->videoFlags & VF_STREAMS_ON))
         SavageStreamsOff(pScrn);
     SavageWriteMode(pScrn, vgaSavePtr, SavageSavePtr, FALSE);
     SavageResetStreams(pScrn);
@@ -3683,7 +3683,7 @@ Bool SavageSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
 
     TRACE(("SavageSwitchMode\n"));
 
-    if (psav->FBStart2nd)
+    if (psav->FBStart2nd || (psav->videoFlags & VF_STREAMS_ON))
         SavageStreamsOff(xf86Screens[scrnIndex]);
 
     success = SavageModeInit(xf86Screens[scrnIndex], mode);
