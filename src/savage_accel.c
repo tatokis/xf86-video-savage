@@ -309,7 +309,12 @@ SavageInitialize2DEngine(ScrnInfoPtr pScrn)
 	OUTREG(0x48C14, (psav->cobOffset >> 11) | (psav->cobIndex << 29)); /* tim */
     	/*OUTREG(S3_OVERFLOW_BUFFER, psav->cobOffset >> 11 | 0xE0000000);*/ /* S3 */
 	/* Program shadow status update. */
-	OUTREG(0x48C10, 0x78207220);
+	{
+	    unsigned long thresholds = ((psav->bciThresholdLo & 0xffff) << 16) |
+		(psav->bciThresholdHi & 0xffff);
+	    OUTREG(0x48C10, thresholds);
+	    /* used to be 0x78207220 */
+	}
 	if( psav->ShadowStatus )
 	{
 	    OUTREG(0x48C0C, psav->ShadowPhysical | 1 );
@@ -336,7 +341,12 @@ SavageInitialize2DEngine(ScrnInfoPtr pScrn)
 	    OUTREG(0x48C14, (psav->cobOffset >> 11) | (psav->cobIndex << 29));
 	}
 	/* Program shadow status update */ /* AGD: what should this be? */
-	OUTREG(0x48C10, 0x00700040); /* tim */
+	{
+	    unsigned long thresholds = ((psav->bciThresholdHi & 0x1fffe0) << 11) |
+		((psav->bciThresholdLo & 0x1fffe0) >> 5);
+	    OUTREG(0x48C10, thresholds);
+	}
+	/*OUTREG(0x48C10, 0x00700040);*/ /* tim */
         /*OUTREG(0x48C10, 0x0e440f04L);*/ /* S3 */
 	if( psav->ShadowStatus )
 	{
@@ -1677,10 +1687,11 @@ SavageInitAccel(ScreenPtr pScreen)
         int widthBytes = psav->lDelta;
         int bufferSize = ((pScrn->virtualY * widthBytes + SAVAGE_BUFFER_ALIGN)
                           & ~SAVAGE_BUFFER_ALIGN);
-        int tiledwidthBytes,tiledBufferSize;
+        int tiledWidth, tiledwidthBytes,tiledBufferSize;
 
         pSAVAGEDRIServer->frontbufferSize = bufferSize;
         tiledwidthBytes = psav->lDelta;
+	tiledWidth = tiledwidthBytes / cpp;
         
         if (cpp == 2) {
             tiledBufferSize = ((pScrn->virtualX+63)/64)*((pScrn->virtualY+15)/16)
@@ -1731,11 +1742,11 @@ SavageInitAccel(ScreenPtr pScreen)
             0x200000;
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "videoRambytes:0x%08lx \n",
+                    "videoRambytes:0x%08x \n",
                     psav->videoRambytes);
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "textureSize:0x%08lx \n",
+                    "textureSize:0x%08x \n",
                     pSAVAGEDRIServer->textureSize);
 
         /* If that gives us less than half the available memory, let's
@@ -1768,7 +1779,7 @@ SavageInitAccel(ScreenPtr pScreen)
         }
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "textureSize:0x%08lx \n",
+                    "textureSize:0x%08x \n",
                     pSAVAGEDRIServer->textureSize);
 
         /* Reserve space for textures */
@@ -1779,7 +1790,7 @@ SavageInitAccel(ScreenPtr pScreen)
                                            pSAVAGEDRIServer->textureSize) & ~SAVAGE_BUFFER_ALIGN;
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "textureOffset:0x%08lx \n",
+                    "textureOffset:0x%08x \n",
                     pSAVAGEDRIServer->textureOffset);
 
         /* Reserve space for the shared depth buffer */
@@ -1792,7 +1803,7 @@ SavageInitAccel(ScreenPtr pScreen)
         pSAVAGEDRIServer->depthPitch = tiledwidthBytes;
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "depthOffset:0x%08lx,depthPitch:%d\n",
+                    "depthOffset:0x%08x,depthPitch:%d\n",
                     pSAVAGEDRIServer->depthOffset,pSAVAGEDRIServer->depthPitch);
 
         /* Reserve space for the shared back buffer */
@@ -1802,8 +1813,46 @@ SavageInitAccel(ScreenPtr pScreen)
         pSAVAGEDRIServer->backPitch = tiledwidthBytes;
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                    "backOffset:0x%08lx,backPitch:%d\n",
+                    "backOffset:0x%08x,backPitch:%d\n",
                     pSAVAGEDRIServer->backOffset,pSAVAGEDRIServer->backPitch);
+
+	/* Compute bitmap descriptors for front, back and depth buffers */
+	if ((psav->Chipset == S3_TWISTER)
+	    || (psav->Chipset == S3_PROSAVAGE)
+	    || (psav->Chipset == S3_PROSAVAGEDDR)
+	    || (psav->Chipset == S3_SUPERSAVAGE)) { 
+	    pSAVAGEDRIServer->frontBitmapDesc =
+		BCI_BD_BW_DISABLE | /* block write disabled */
+		(1<<24) | /* destination tile format */
+		(pScrn->bitsPerPixel<<16) | /* bpp */
+		tiledWidth; /* stride */
+	    pSAVAGEDRIServer->backBitmapDesc =
+		BCI_BD_BW_DISABLE |
+		(1<<24) |
+		(pScrn->bitsPerPixel<<16) |
+		tiledWidth;
+	    pSAVAGEDRIServer->depthBitmapDesc =
+		BCI_BD_BW_DISABLE |
+		(1<<24) |
+		(pScrn->bitsPerPixel<<16) | /* FIXME: allow zpp != cpp */
+		tiledWidth;
+	} else {
+	    pSAVAGEDRIServer->frontBitmapDesc =
+		BCI_BD_BW_DISABLE | /* block write disabled */
+		(cpp==2 ? BCI_BD_TILE_16:BCI_BD_TILE_32) | /*16/32 bpp tile format */
+		(pScrn->bitsPerPixel<<16) | /* bpp */
+		tiledWidth; /* stride */
+	    pSAVAGEDRIServer->backBitmapDesc =
+		BCI_BD_BW_DISABLE |
+		(cpp==2 ? BCI_BD_TILE_16:BCI_BD_TILE_32) |
+		(pScrn->bitsPerPixel<<16) |
+		tiledWidth;
+	    pSAVAGEDRIServer->depthBitmapDesc =
+		BCI_BD_BW_DISABLE |
+		(cpp==2 ? BCI_BD_TILE_16:BCI_BD_TILE_32) |
+		(pScrn->bitsPerPixel<<16) | /* FIXME: allow zpp != cpp */
+		tiledWidth;
+	}
 
         /*scanlines = pSAVAGEDRIServer->backOffset / widthBytes - 1;*/
         /*if ( scanlines > maxlines ) scanlines = maxlines;*/
@@ -1892,7 +1941,7 @@ SavageInitAccel(ScreenPtr pScreen)
         }
         if(psav->reserved)
             xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-                        "Reserved for tiled front buffer at offset 0x%08lx ,size:0x%08lx\n",
+                        "Reserved for tiled front buffer at offset 0x%08x ,size:0x%08x\n",
                         psav->reserved->offset, psav->reserved->size);
 
         xf86DrvMsg( pScrn->scrnIndex, X_INFO,

@@ -233,6 +233,7 @@ int SAVAGEXvMCCreateContext (ScrnInfoPtr pScrn, XvMCContextPtr pContext,
   SavagePtr pSAVAGE = SAVPTR(pScrn);
   DRIInfoPtr pDRIInfo = pSAVAGE->pDRIInfo;
   SAVAGEDRIPtr pSAVAGEDriPriv = (SAVAGEDRIPtr)pDRIInfo->devPrivate;
+  SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = pSAVAGE->DRIServerInfo;
   SAVAGEXvMCCreateContextRec *contextRec;
   vgaHWPtr hwp = VGAHWPTR(pScrn);
 
@@ -272,19 +273,19 @@ int SAVAGEXvMCCreateContext (ScrnInfoPtr pScrn, XvMCContextPtr pContext,
   pSAVAGE->xvmcContext = contextRec->drmcontext;
   contextRec->fbBase = pScrn->memPhysBase;
 
-  contextRec->MMIOHandle = pSAVAGEDriPriv->registers.handle;
-  contextRec->MMIOSize = pSAVAGEDriPriv->registers.size;
+  contextRec->MMIOHandle = pSAVAGEDRIServer->registers.handle;
+  contextRec->MMIOSize = pSAVAGEDRIServer->registers.size;
 
-  contextRec->DCTBlockHandle = pSAVAGEDriPriv->agpTextures.handle;
-  contextRec->DCTBlockOffset = pSAVAGEDriPriv->agpTextures.offset;
-  contextRec->DCTBlockSize = pSAVAGEDriPriv->agpTextures.size;
+  contextRec->DCTBlockHandle = pSAVAGEDRIServer->agpTextures.handle;
+  contextRec->DCTBlockOffset = pSAVAGEDRIServer->agpTextures.offset;
+  contextRec->DCTBlockSize = pSAVAGEDRIServer->agpTextures.size;
 
   contextRec->SurfaceHandle = pSAVAGEDriPriv->xvmcSurfHandle;
   contextRec->SurfaceOffset = pSAVAGE->hwmcOffset;
   contextRec->SurfaceSize = pSAVAGE->hwmcSize;
 
-  contextRec->ApertureHandle = pSAVAGEDriPriv->aperture.handle;
-  contextRec->ApertureSize = pSAVAGEDriPriv->aperture.size;
+  contextRec->ApertureHandle = pSAVAGEDriPriv->apertureHandle;
+  contextRec->ApertureSize = pSAVAGEDriPriv->apertureSize;
 
   contextRec->bitsPerPixel = pScrn->bitsPerPixel;
   contextRec->frameX0 = pScrn->frameX0;

@@ -30,7 +30,6 @@
 #define _XF86DRI_SERVER_
 #include "savage_dripriv.h"
 #include "savage_dri.h"
-#include "savage_drm.h"
 #include "dri.h"
 #include "GL/glxint.h"
 #endif
@@ -84,6 +83,15 @@ typedef struct
 #define SAVAGE_CRT_ON	1
 #define SAVAGE_LCD_ON	2
 #define SAVAGE_TV_ON	4
+
+#define SAVAGE_DRIVER_NAME	"savage"
+#define SAVAGE_DRIVER_VERSION	"2.0.0"
+#define SAVAGE_VERSION_MAJOR	2
+#define SAVAGE_VERSION_MINOR	0
+#define SAVAGE_PATCHLEVEL	0
+#define SAVAGE_VERSION	((SAVAGE_VERSION_MAJOR << 24) | \
+			 (SAVAGE_VERSION_MINOR << 16) | \
+			 SAVAGE_PATCHLEVEL)
 
 typedef struct _S3VMODEENTRY {
    unsigned short Width;
@@ -285,6 +293,8 @@ typedef struct _Savage {
     unsigned long	cobIndex;	/* size index */
     unsigned long	cobSize;	/* size in bytes */
     unsigned long	cobOffset;	/* offset in frame buffer */
+    unsigned long       bciThresholdLo; /* low and hight thresholds for */
+    unsigned long       bciThresholdHi; /* shadow status update (32bit words) */
 
     /* Support for DGA */
     int			numDGAModes;

@@ -91,16 +91,6 @@ extern ScrnInfoPtr gpScrn;
 
 #define iabs(a)	((int)(a)>0?(a):(-(a)))
 
-#define DRIVER_NAME	"savage"
-#define DRIVER_VERSION	"1.1.27a"
-#define VERSION_MAJOR	1
-#define VERSION_MINOR	1
-#define PATCHLEVEL	27
-#define SAVAGE_VERSION	((VERSION_MAJOR << 24) | \
-			 (VERSION_MINOR << 16) | \
-			 PATCHLEVEL)
-
-
 /*#define TRACEON*/
 #ifdef TRACEON
 #define TRACE(prms)	ErrorF prms
@@ -113,7 +103,7 @@ int gSavageEntityIndex = -1;
 DriverRec SAVAGE =
 {
     SAVAGE_VERSION,
-    DRIVER_NAME,
+    SAVAGE_DRIVER_NAME,
     SavageIdentify,
     SavageProbe,
     SavageAvailableOptions,
@@ -421,7 +411,7 @@ static XF86ModuleVersionInfo SavageVersRec = {
     MODINFOSTRING1,
     MODINFOSTRING2,
     XORG_VERSION_CURRENT,
-    VERSION_MAJOR, VERSION_MINOR, PATCHLEVEL,
+    SAVAGE_VERSION_MAJOR, SAVAGE_VERSION_MINOR, SAVAGE_PATCHLEVEL,
     ABI_CLASS_VIDEODRV,
     ABI_VIDEODRV_VERSION,
     MOD_CLASS_VIDEODRV,
@@ -502,12 +492,15 @@ ShadowWait( SavagePtr psav )
     if( !psav->NoPCIRetry )
 	return 0;
 
-    psav->ShadowCounter = (psav->ShadowCounter + 1) & 0x7fff;
+    psav->ShadowCounter = (psav->ShadowCounter + 1) & 0xffff;
+    if (psav->ShadowCounter == 0)
+	psav->ShadowCounter++; /* 0 is reserved for the BIOS
+				  to avoid confusion in the DRM */
     BCI_SEND( psav->dwBCIWait2DIdle );
     BCI_SEND( 0x98000000 + psav->ShadowCounter );
 
     while(
-	(int)(psav->ShadowVirtual[1] & 0x7fff) != psav->ShadowCounter  &&
+	(int)(psav->ShadowVirtual[1] & 0xffff) != psav->ShadowCounter  &&
 	(loop++ < MAXLOOP)
     )
 	;
@@ -714,7 +707,7 @@ static const OptionInfoRec * SavageAvailableOptions(int chipid, int busid)
 static void SavageIdentify(int flags)
 {
     xf86PrintChipsets("SAVAGE", 
-		      "driver (version " DRIVER_VERSION ") for S3 Savage chipsets",
+		      "driver (version " SAVAGE_DRIVER_VERSION ") for S3 Savage chipsets",
 		      SavageChips);
 }
 
@@ -760,7 +753,7 @@ static Bool SavageProbe(DriverPtr drv, int flags)
             {
 
  	        pScrn->driverVersion = SAVAGE_VERSION;
-	        pScrn->driverName = DRIVER_NAME;
+	        pScrn->driverName = SAVAGE_DRIVER_NAME;
 	        pScrn->name = "SAVAGE";
 	        pScrn->Probe = SavageProbe;
 	        pScrn->PreInit = SavagePreInit;
@@ -1580,6 +1573,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	*/
         psav->cobIndex = 0;
         psav->cobSize = 0;
+	psav->bciThresholdHi = 32;
+	psav->bciThresholdLo = 0;
     } else {
         /* We use 128kB for the COB on all other chips. */        
         psav->cobSize = 0x20000;
@@ -1588,6 +1583,9 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	} else {
 	    psav->cobIndex = 2;
 	}
+	/* max command size: 2560 entries */
+	psav->bciThresholdHi = psav->cobSize/4 + 32 - 2560;
+	psav->bciThresholdLo = psav->bciThresholdHi - 2560;
     }
              
     /* align cob to 128k */
@@ -2747,14 +2745,8 @@ static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
     int cpp = pScrn->bitsPerPixel / 8;
-    /*int widthBytes = pScrn->displayWidth * cpp;*/
-    int widthBytes = psav->lDelta;
-    int bufferSize = ((pScrn->virtualY * widthBytes + SAVAGE_BUFFER_ALIGN)
-                          & ~SAVAGE_BUFFER_ALIGN);
-    int tiledwidthBytes, tiledBufferSize, RamNeededFor3D;
+    int tiledBufferSize, RamNeededFor3D;
 
-    tiledwidthBytes = psav->lDelta;
-        
     if (cpp == 2) {
         tiledBufferSize = ((pScrn->virtualX+63)/64)*((pScrn->virtualY+15)/16) * 2048;
     } else {
@@ -2763,7 +2755,7 @@ static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 
     RamNeededFor3D = 4096 + /* hw cursor*/
                      psav->cobSize + /*COB*/
-                     bufferSize + /* front buffer */
+                     tiledBufferSize + /* front buffer */
                      tiledBufferSize + /* back buffer */
                      tiledBufferSize; /* depth buffer */
 
@@ -2845,9 +2837,6 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 
     vgaHWBlankScreen(pScrn, TRUE);
 
-    if (!SavageModeInit(pScrn, pScrn->currentMode))
-	return FALSE;
-
 #ifdef XF86DRI
     if (psav->IsSecondary) {
 	    psav->directRenderingEnabled = FALSE;
@@ -2858,10 +2847,14 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 			"Direct Rendering Disabled -- "
 			"Dual-head configuration is not working with "
 			"DRI at present.\n");
-    } else if (!psav->bTiled) {
+    } else if (/*!psav->bTiled*/psav->bDisableTile) {
             xf86DrvMsg(scrnIndex, X_WARNING, 
 	    		"Direct Rendering requires a tiled framebuffer -- "
-			"Set Option \"DisableTile\" \"false\"\n");			    
+			"Set Option \"DisableTile\" \"false\"\n");
+    } else if (psav->cobSize == 0) {
+            xf86DrvMsg(scrnIndex, X_WARNING, 
+	    		"Direct Rendering requires the COB -- "
+			"Set Option \"DisableCOB\" \"false\"\n");
     } else if (((psav->Chipset == S3_TWISTER)
         || (psav->Chipset == S3_PROSAVAGE)
         || (psav->Chipset == S3_SAVAGE4)
@@ -2883,6 +2876,9 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
         xf86DrvMsg(pScrn->scrnIndex,X_ERROR,"DRI isn't enabled\n");
     }
 #endif
+
+    if (!SavageModeInit(pScrn, pScrn->currentMode))
+	return FALSE;
 
     miClearVisualTypes();
 

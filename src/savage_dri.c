@@ -44,6 +44,7 @@
 #include "savage_driver.h"
 #include "savage_bci.h"
 #include "savage_streams.h"
+#include "savage_common.h"
 
 #define _XF86DRI_SERVER_
 #include "GL/glxtokens.h"
@@ -91,7 +92,6 @@ SAVAGEDRISubsequentSolidFillRect(
 extern int
 SavageHelpSolidROP(ScrnInfoPtr pScrn, int *fg,int pm,int *rop);
 #endif
-unsigned long SAVAGEDRIGetPhyAddress(ScrnInfoPtr pScrn,void * pointer);
 
 /* Initialize the visual configs that are supported by the hardware.
  * These are combined with the visual configs that the indirect
@@ -322,23 +322,26 @@ static Bool SAVAGECreateContext( ScreenPtr pScreen, VisualPtr visual,
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
+#if 0
     SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
     savageAgpBufferPtr pAgp;
     
     int ret,size,i;
     unsigned long  handle,map_handle;
-    drm_savage_sarea_t * pShare;
+    SAVAGESAREAPrivPtr pShare;
     unsigned long offset;
-   
+#endif
+
     if(psav->xvmcContext)
         return FALSE;
     else
     {
         psav->DRIrunning++;
     }
+
+#if 0
     /* alloc agp memory to dma */
-    pShare = (drm_savage_sarea_ptr)DRIGetSAREAPrivate(pScreen);
-    pShare->agp_offset=0;
+    pShare = (SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
     /* find the available buffer*/
     for (i=0,pAgp = pSAVAGEDRIServer->agpBuffer;i<pSAVAGEDRIServer->numBuffer;i++,pAgp++)
     {
@@ -377,7 +380,7 @@ static Bool SAVAGECreateContext( ScreenPtr pScreen, VisualPtr visual,
     pAgp->flags = 1;
     pAgp->agp_handle = handle;
     pAgp->map_handle = map_handle;
-    pShare->agp_offset=map_handle;
+#endif
     
     return TRUE;
     
@@ -388,16 +391,16 @@ static void SAVAGEDestroyContext( ScreenPtr pScreen, drm_context_t hwContext,
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
-
+#if 0
     SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
     savageAgpBufferPtr pAgp;
-    drm_savage_sarea_t * pShare;
+    SAVAGESAREAPrivPtr pShare;
     int i;
     unsigned long handle,map_handle;
-    
+#endif
     psav->DRIrunning--;
-
-    pShare = (drm_savage_sarea_ptr)DRIGetSAREAPrivate(pScreen);
+#if 0
+    pShare = (SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
     
     for (i=0,pAgp = pSAVAGEDRIServer->agpBuffer;i<pSAVAGEDRIServer->numBuffer;i++,pAgp++)
     {
@@ -415,6 +418,7 @@ static void SAVAGEDestroyContext( ScreenPtr pScreen, drm_context_t hwContext,
     drmAgpFree(psav->drmFD,handle);
     pAgp->flags=0;
     pAgp->ctxOwner=0;
+#endif
 }
 
 #if 0
@@ -553,6 +557,7 @@ static void SAVAGESwapContextShared( ScreenPtr pScreen )
  * We don't wrap wakeuphandler any longer, so at least we can say that
  * this doesn't happen *every time the mouse moves*...
  */
+#if 0
 static void
 SAVAGEDRISwapContext( ScreenPtr pScreen, DRISyncType syncType,
 		   DRIContextType oldContextType, void *oldContext,
@@ -582,6 +587,7 @@ SAVAGEDRISwapContext( ScreenPtr pScreen, DRISyncType syncType,
    }
 #endif
 }
+#endif
 
 /* no Double-Head */
 #if 0
@@ -646,10 +652,58 @@ static void SAVAGEBlockHandler( int screenNum, pointer blockData,
 }
 #endif
 
+static void SAVAGEWakeupHandler( int screenNum, pointer wakeupData,
+				 unsigned long result, pointer pReadmask )
+{
+   ScreenPtr pScreen = screenInfo.screens[screenNum];
+   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+   SavagePtr psav = SAVPTR(pScrn);
+
+   DRILock(pScreen, 0);
+   psav->LockHeld = 1;
+   if (psav->ShadowStatus) {
+      /* fetch the global shadow counter */
+#if 0
+      if (psav->ShadowCounter != (psav->ShadowVirtual[1023] & 0xffff))
+	 xf86DrvMsg( pScrn->scrnIndex, X_INFO,
+		     "[dri] WakeupHandler: shadowCounter adjusted from %04x to %04lx\n",
+		     psav->ShadowCounter, psav->ShadowVirtual[1023] & 0xffff);
+#endif
+      psav->ShadowCounter = psav->ShadowVirtual[1023] & 0xffff;
+   }
+   psav->AccelInfoRec->NeedToSync = TRUE;
+   /* FK: this flag doesn't seem to be used. */
+}
+
+static void SAVAGEBlockHandler( int screenNum, pointer blockData,
+				pointer pTimeout, pointer pReadmask)
+{
+   ScreenPtr pScreen = screenInfo.screens[screenNum];
+   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+   SavagePtr psav = SAVPTR(pScrn);
+
+   if (psav->ShadowStatus) {
+      /* update the global shadow counter */
+      CARD32 globalShadowCounter = psav->ShadowVirtual[1023];
+      globalShadowCounter = (globalShadowCounter & 0xffff0000) |
+	  ((CARD32)psav->ShadowCounter & 0x0000ffff);
+
+#if 0
+      if (globalShadowCounter != psav->ShadowVirtual[1023])
+	 xf86DrvMsg( pScrn->scrnIndex, X_INFO,
+		     "[dri] BlockHandler: shadowCounter adjusted from %08lx to %08x\n",
+		     psav->ShadowVirtual[1023], globalShadowCounter);
+#endif
+      psav->ShadowVirtual[1023] = globalShadowCounter;
+   }
+   psav->LockHeld = 0;
+   DRIUnlock(pScreen);
+}
+
 void SAVAGESelectBuffer( ScrnInfoPtr pScrn, int which )
 {
    SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
+   SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
 
    psav->WaitIdleEmpty(psav);
 
@@ -657,17 +711,17 @@ void SAVAGESelectBuffer( ScrnInfoPtr pScrn, int which )
    
    switch ( which ) {
    case SAVAGE_BACK:
-      OUTREG( 0x8170, pSAVAGEDRI->backOffset );
-      OUTREG( 0x8174, pSAVAGEDRI->backBitmapDesc );
+      OUTREG( 0x8170, pSAVAGEDRIServer->backOffset );
+      OUTREG( 0x8174, pSAVAGEDRIServer->backBitmapDesc );
       break;
    case SAVAGE_DEPTH:
-      OUTREG( 0x8170, pSAVAGEDRI->depthOffset );
-      OUTREG( 0x8174, pSAVAGEDRI->depthBitmapDesc );
+      OUTREG( 0x8170, pSAVAGEDRIServer->depthOffset );
+      OUTREG( 0x8174, pSAVAGEDRIServer->depthBitmapDesc );
       break;
    default:
    case SAVAGE_FRONT:
-      OUTREG( 0x8170, pSAVAGEDRI->frontOffset );
-      OUTREG( 0x8174, pSAVAGEDRI->frontBitmapDesc );
+      OUTREG( 0x8170, pSAVAGEDRIServer->frontOffset );
+      OUTREG( 0x8174, pSAVAGEDRIServer->frontBitmapDesc );
       break;
    }
    OUTREG(0x48C18,INREG(0x48C18)|(0x00000008));
@@ -693,19 +747,21 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
    unsigned long mode;
    unsigned int vendor, device;
-   int ret;
-   int size,numbuffer,i;
-   savageAgpBufferPtr agpbuffer;
-   
+   int ret, count;
+   /*int size,numbuffer,i;
+   savageAgpBufferPtr agpbuffer;*/
 
-   /*pSAVAGEDRIServer->agp.size = 16 * 1024 * 1024;*/
+   if (psav->agpSize < 2) psav->agpSize = 2; /* at least 2MB for DMA buffers */
+
    pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
-   pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size;
-   
-   pSAVAGEDRIServer->agpTextures.offset = 0;
-   /*pSAVAGEDRIServer->agpTextures.size  = 16*1024*1024;*/
-   pSAVAGEDRIServer->agpTextures.size  = psav->agpSize * 1024 * 1024;
-   pSAVAGEDRIServer->logAgpTextureGranularity = 10;
+   pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size; /* ? */
+
+   pSAVAGEDRIServer->buffers.offset = 0;
+   pSAVAGEDRIServer->buffers.size = SAVAGE_NUM_BUFFERS * SAVAGE_BUFFER_SIZE;
+
+   pSAVAGEDRIServer->agpTextures.offset = pSAVAGEDRIServer->buffers.size;
+   pSAVAGEDRIServer->agpTextures.size = (pSAVAGEDRIServer->agp.size -
+					 pSAVAGEDRIServer->buffers.size);
 
    if ( drmAgpAcquire( psav->drmFD ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not available\n" );
@@ -750,7 +806,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
       return FALSE;
    }
    xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[agp] %d kB allocated with handle 0x%08x\n",
+	       "[agp] %d kB allocated with handle 0x%08lx\n",
 	       pSAVAGEDRIServer->agp.size/1024, pSAVAGEDRIServer->agp.handle );
 
    if ( drmAgpBind( psav->drmFD, pSAVAGEDRIServer->agp.handle, 0 ) < 0 ) {
@@ -760,6 +816,48 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
       return FALSE;
    }
 
+   /* DMA buffers
+    */
+   if ( drmAddMap( psav->drmFD,
+		   pSAVAGEDRIServer->buffers.offset,
+		   pSAVAGEDRIServer->buffers.size,
+		   DRM_AGP, 0,
+		   &pSAVAGEDRIServer->buffers.handle ) < 0 ) {
+      xf86DrvMsg( pScreen->myNum, X_ERROR,
+		  "[agp] Could not add DMA buffers mapping\n" );
+      return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[agp] DMA buffers handle = 0x%08lx\n",
+	       pSAVAGEDRIServer->buffers.handle );
+   /* not needed in the server
+   if ( drmMap( psav->drmFD,
+		pSAVAGEDRIServer->buffers.handle,
+		pSAVAGEDRIServer->buffers.size,
+		&pSAVAGEDRIServer->buffers.map ) < 0 ) {
+      xf86DrvMsg( pScreen->myNum, X_ERROR,
+		  "[agp] Could not map DMA buffers\n" );
+      return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[agp] DMA buffers mapped at 0x%08lx\n",
+	       (unsigned long)pSAVAGEDRIServer->buffers.map );
+   */
+   count = drmAddBufs( psav->drmFD,
+		       SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE,
+		       DRM_AGP_BUFFER, pSAVAGEDRIServer->buffers.offset );
+   if ( count <= 0 ) {
+      xf86DrvMsg( pScrn->scrnIndex, X_INFO,
+		  "[drm] failure adding %d %d byte DMA buffers (%d)\n",
+		  SAVAGE_NUM_BUFFERS, SAVAGE_BUFFER_SIZE, count );
+      return FALSE;
+   }
+   xf86DrvMsg( pScreen->myNum, X_INFO,
+	       "[drm] Added %d %d byte DMA buffers\n",
+	       count, SAVAGE_BUFFER_SIZE );
+
+   /* AGP textures
+    */
    if ( drmAddMap( psav->drmFD,
 		   pSAVAGEDRIServer->agpTextures.offset,
 		   pSAVAGEDRIServer->agpTextures.size,
@@ -774,20 +872,23 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
 	       "[agp] agpTextures microcode handle = 0x%08lx\n",
 	       pSAVAGEDRIServer->agpTextures.handle );
 
-   /*if ( drmMap( psav->drmFD,
+   /* not needed in the server
+   if ( drmMap( psav->drmFD,
 		pSAVAGEDRIServer->agpTextures.handle,
 		pSAVAGEDRIServer->agpTextures.size,
 		&pSAVAGEDRIServer->agpTextures.map ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR,
 		  "[agp] Could not map agpTextures \n" );
       return FALSE;
-   }*/
+   }
    
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] agpTextures mapped at 0x%08lx\n",
 	       (unsigned long)pSAVAGEDRIServer->agpTextures.map );
+   */
 
    /* for agp dma buffer*/
+#if 0
    size = drmAgpSize(psav->drmFD);
    size -=    pSAVAGEDRIServer->agpTextures.size;/*sub texture size*/
    numbuffer = size /  DRM_SAVAGE_DMA_AGP_SIZE;
@@ -802,7 +903,8 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    }
    pSAVAGEDRIServer->numBuffer = numbuffer;
    pSAVAGEDRIServer->agpBuffer = agpbuffer;
-        
+#endif
+   
    return TRUE;
 }
 
@@ -851,36 +953,43 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    
    }*/
 
-   pSAVAGEDRIServer->status.size = SAREA_MAX;
+   if ( psav->ShadowStatus ) {
+      pSAVAGEDRIServer->status.size = 4096; /* 1 page */
 
-   if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
-		   DRM_SHM, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
-		   &pSAVAGEDRIServer->status.handle ) < 0 ) {
-      xf86DrvMsg( pScreen->myNum, X_ERROR,
-		  "[drm] Could not add status page mapping\n" );
-      return FALSE;
-   }
-   xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[drm] Status handle = 0x%08lx\n",
-	       pSAVAGEDRIServer->status.handle );
+      if ( drmAddMap( psav->drmFD, 0, pSAVAGEDRIServer->status.size,
+		      DRM_CONSISTENT, DRM_READ_ONLY | DRM_LOCKED | DRM_KERNEL,
+		      &pSAVAGEDRIServer->status.handle ) < 0 ) {
+	 xf86DrvMsg( pScreen->myNum, X_ERROR,
+		     "[drm] Could not add status page mapping\n" );
+	 return FALSE;
+      }
+      xf86DrvMsg( pScreen->myNum, X_INFO,
+		  "[drm] Status handle = 0x%08lx\n",
+		  pSAVAGEDRIServer->status.handle );
 
-   if ( drmMap( psav->drmFD,
-		pSAVAGEDRIServer->status.handle,
-		pSAVAGEDRIServer->status.size,
-		&pSAVAGEDRIServer->status.map ) < 0 ) {
-      xf86DrvMsg( pScreen->myNum, X_ERROR,
-		  "[agp] Could not map status page\n" );
-      return FALSE;
+      if ( drmMap( psav->drmFD,
+		   pSAVAGEDRIServer->status.handle,
+		   pSAVAGEDRIServer->status.size,
+		   &pSAVAGEDRIServer->status.map ) < 0 ) {
+	 xf86DrvMsg( pScreen->myNum, X_ERROR,
+		     "[drm] Could not map status page\n" );
+	 return FALSE;
+      }
+      xf86DrvMsg( pScreen->myNum, X_INFO,
+		  "[drm] Status page mapped at 0x%08lx\n",
+		  (unsigned long)pSAVAGEDRIServer->status.map );
+
+      psav->ShadowPhysical = pSAVAGEDRIServer->status.handle;
+      psav->ShadowVirtual = pSAVAGEDRIServer->status.map;
+   } else {
+      pSAVAGEDRIServer->status.size = 0;
+      pSAVAGEDRIServer->status.handle = 0;
+      pSAVAGEDRIServer->status.map = NULL;
    }
-   xf86DrvMsg( pScreen->myNum, X_INFO,
-	       "[agp] Status page mapped at 0x%08lx\n",
-	       (unsigned long)pSAVAGEDRIServer->status.map );
 
    return TRUE;
 }
 
-/* no need DMA */
-#if 0 
 static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
 {
    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
@@ -891,61 +1000,42 @@ static Bool SAVAGEDRIKernelInit( ScreenPtr pScreen )
 
    memset( &init, 0, sizeof(drmSAVAGEInit) );
 
+   init.func = SAVAGE_INIT_BCI;
    init.sarea_priv_offset = sizeof(XF86DRISAREARec);
 
-   switch ( psav->Chipset ) {
-   case PCI_CHIP_SAVAGEG400:
-      init.chipset = SAVAGE_CARD_TYPE_G400;
-      break;
-   case PCI_CHIP_SAVAGEG200:
-   case PCI_CHIP_SAVAGEG200_PCI:
-      init.chipset = SAVAGE_CARD_TYPE_G200;
-      break;
-   default:
-      return FALSE;
-   }
-   init.sgram = !psav->HasSDRAM;
+   init.cob_size = psav->cobSize/4; /* size in 32-bit entries */
+   init.bci_threshold_lo = psav->bciThresholdLo;
+   init.bci_threshold_hi = psav->bciThresholdHi;
+   init.dma_type = SAVAGE_DMA_AGP; /* PCI support will be added soon */
 
-   init.maccess = psav->MAccess;
-
-   init.fb_cpp		= pScrn->bitsPerPixel / 8;
+   init.fb_bpp		= pScrn->bitsPerPixel;
    init.front_offset	= pSAVAGEDRIServer->frontOffset;
-   init.front_pitch	= pSAVAGEDRIServer->frontPitch / init.fb_cpp;
+   init.front_pitch	= pSAVAGEDRIServer->frontPitch;
    init.back_offset	= pSAVAGEDRIServer->backOffset;
-   init.back_pitch	= pSAVAGEDRIServer->backPitch / init.fb_cpp;
+   init.back_pitch	= pSAVAGEDRIServer->backPitch;
 
-   init.depth_cpp	= pScrn->bitsPerPixel / 8;
+   init.depth_bpp	= pScrn->bitsPerPixel;
    init.depth_offset	= pSAVAGEDRIServer->depthOffset;
-   init.depth_pitch	= pSAVAGEDRIServer->depthPitch / init.depth_cpp;
+   init.depth_pitch	= pSAVAGEDRIServer->depthPitch;
 
-   init.texture_offset[0] = pSAVAGEDRIServer->textureOffset;
-   init.texture_size[0] = pSAVAGEDRIServer->textureSize;
+   init.texture_offset  = pSAVAGEDRIServer->textureOffset;
+   init.texture_size    = pSAVAGEDRIServer->textureSize;
 
-   init.fb_offset = psav->FbAddress;
-   init.mmio_offset = pSAVAGEDRIServer->registers.handle;
-   init.status_offset = pSAVAGEDRIServer->status.handle;
+   init.status_offset   = pSAVAGEDRIServer->status.handle;
+   init.buffers_offset  = pSAVAGEDRIServer->buffers.handle;
+   init.agp_textures_offset = pSAVAGEDRIServer->agpTextures.handle;
 
-   init.warp_offset = pSAVAGEDRIServer->warp.handle;
-   init.primary_offset = pSAVAGEDRIServer->primary.handle;
-   init.buffers_offset = pSAVAGEDRIServer->buffers.handle;
-
-   ret = drmSAVAGEInitDMA( psav->drmFD, &init );
+   ret = drmCommandWrite( psav->drmFD, DRM_SAVAGE_BCI_INIT, &init, sizeof(init) );
    if ( ret < 0 ) {
       xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
-		  "[drm] Failed to initialize DMA! (%d)\n", ret );
+		  "[drm] Failed to initialize BCI! (%d)\n", ret );
       return FALSE;
    }
-
-#if 0
-   /* FIXME: This is just here to clean up after the engine reset test
-    * in the kernel module.  Please remove it later...
-    */
-   psav->GetQuiescence( pScrn );
-#endif
 
    return TRUE;
 }
 
+#if 0
 static Bool SAVAGEDRIBuffersInit( ScreenPtr pScreen )
 {
    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
@@ -1051,16 +1141,17 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
               psav->PciInfo->device,
               psav->PciInfo->func);
    }
-   pDRIInfo->ddxDriverMajorVersion = 1/*SAVAGE_MAJOR_VERSION*/;
-   pDRIInfo->ddxDriverMinorVersion = 1/*SAVAGE_MINOR_VERSION*/;
-   pDRIInfo->ddxDriverPatchVersion = 16/*SAVAGE_PATCHLEVEL*/;
+   pDRIInfo->ddxDriverMajorVersion = SAVAGE_VERSION_MAJOR;
+   pDRIInfo->ddxDriverMinorVersion = SAVAGE_VERSION_MINOR;
+   pDRIInfo->ddxDriverPatchVersion = SAVAGE_PATCHLEVEL;
    pDRIInfo->frameBufferPhysicalAddress = psav->FrameBufferBase;
    pDRIInfo->frameBufferSize = psav->videoRambytes;
    pDRIInfo->frameBufferStride = pScrn->displayWidth*(pScrn->bitsPerPixel/8);
    pDRIInfo->ddxDrawableTableEntry = SAVAGE_MAX_DRAWABLES;
 
 /* mark off these... we use default */
-#if 0
+/* FK: switch them on again */
+#if 1
    pDRIInfo->wrap.BlockHandler = SAVAGEBlockHandler;
    pDRIInfo->wrap.WakeupHandler = SAVAGEWakeupHandler;
 #endif
@@ -1129,7 +1220,8 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
 #endif
  
    {
-      pDRIInfo->SwapContext = SAVAGEDRISwapContext;
+      pDRIInfo->SwapContext = NULL/*SAVAGEDRISwapContext*/;
+      /* FK: SwapContext no longer used with KERNEL_SWAP. */
    }
 
 #if 0
@@ -1173,12 +1265,12 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    {
       drmVersionPtr version = drmGetVersion(psav->drmFD);
       if ( version ) {
-         if ( version->version_major != 1 ||
+         if ( version->version_major != 2 ||
 	      version->version_minor < 0 ) {
             /* incompatible drm version */
             xf86DrvMsg( pScreen->myNum, X_ERROR,
 			"[dri] SAVAGEDRIScreenInit failed because of a version mismatch.\n"
-			"[dri] savage.o kernel module version is %d.%d.%d but version 3.0.x is needed.\n"
+			"[dri] savage.o kernel module version is %d.%d.%d but version 2.0.x is needed.\n"
 			"[dri] Disabling DRI.\n",
 			version->version_major,
 			version->version_minor,
@@ -1237,14 +1329,11 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
    SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
    int i;
-   unsigned int TileStride;
-   unsigned int zTileStride;
-   
    
    if ( !psav->pDRIInfo )
       return FALSE;
 
-   psav->pDRIInfo->driverSwapMethod = DRI_HIDE_X_CONTEXT;
+   psav->pDRIInfo->driverSwapMethod = DRI_KERNEL_SWAP;
 
    /* NOTE: DRIFinishScreenInit must be called before *DRIKernelInit
     * because *DRIKernelInit requires that the hardware lock is held by
@@ -1256,27 +1345,15 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
       return FALSE;
    }
 
-/* no dma...... */
-#if 0
    if ( !SAVAGEDRIKernelInit( pScreen ) ) {
       SAVAGEDRICloseScreen( pScreen );
       return FALSE;
    }
 
+/* no dma...... */
+#if 0
    if ( !SAVAGEDRIBuffersInit( pScreen ) ) {
       SAVAGEDRICloseScreen( pScreen );
-      return FALSE;
-   }
-
-   switch ( psav->Chipset ) {
-   case PCI_CHIP_SAVAGEG400:
-      pSAVAGEDRI->chipset = SAVAGE_CARD_TYPE_G400;
-      break;
-   case PCI_CHIP_SAVAGEG200:
-   case PCI_CHIP_SAVAGEG200_PCI:
-      pSAVAGEDRI->chipset = SAVAGE_CARD_TYPE_G200;
-      break;
-   default:
       return FALSE;
    }
 #endif
@@ -1284,107 +1361,43 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    pSAVAGEDRI->chipset          = psav->Chipset;
    pSAVAGEDRI->width		= pScrn->virtualX;
    pSAVAGEDRI->height		= pScrn->virtualY;
-   pSAVAGEDRI->mem			= pScrn->videoRam * 1024;
-   pSAVAGEDRI->cpp			= pScrn->bitsPerPixel / 8;
-   pSAVAGEDRI->zpp			=pSAVAGEDRI->cpp;  
+   pSAVAGEDRI->mem		= pScrn->videoRam * 1024;
+   pSAVAGEDRI->cpp		= pScrn->bitsPerPixel / 8;
+   pSAVAGEDRI->zpp		= pSAVAGEDRI->cpp;
+
    pSAVAGEDRI->agpMode		= psav->agpMode;
+
+   pSAVAGEDRI->bufferSize       = SAVAGE_BUFFER_SIZE;
 
    pSAVAGEDRI->frontOffset		= pSAVAGEDRIServer->frontOffset;
    pSAVAGEDRI->frontbufferSize		= pSAVAGEDRIServer->frontbufferSize;
-   pSAVAGEDRI->frontbuffer		= psav->FrameBufferBase + 
-                                          pSAVAGEDRI->frontOffset;
-   pSAVAGEDRI->frontPitch		= pSAVAGEDRIServer->frontPitch;
-   pSAVAGEDRI->IsfrontTiled             = psav->bTiled;
-   
-   if(pSAVAGEDRI->cpp==2)
-       TileStride = (pSAVAGEDRI->width+63)&(~63);
-   else
-       TileStride = (pSAVAGEDRI->width+31)&(~31);
 
-   if(pSAVAGEDRI->zpp==2)
-       zTileStride = (pSAVAGEDRI->width+63)&(~63);
-   else
-       zTileStride = (pSAVAGEDRI->width+31)&(~31);
-
-   if ((psav->Chipset == S3_TWISTER)
-      || (psav->Chipset == S3_PROSAVAGE)
-      || (psav->Chipset == S3_PROSAVAGEDDR)
-      || (psav->Chipset == S3_SUPERSAVAGE)) { 
-      	pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
-                	                  (1<<24) | /* destination tile format */
-                        	          (pScrn->bitsPerPixel<<16) | /* bpp */
-                        	          TileStride; /* stride */
-
-        pSAVAGEDRI->backBitmapDesc      = BCI_BD_BW_DISABLE |
-                                          (1<<24) |
-                                          (pScrn->bitsPerPixel<<16) |
-                                          TileStride;
-
-        pSAVAGEDRI->depthBitmapDesc     = BCI_BD_BW_DISABLE |
-                                          (1<<24) |
-                                          (pScrn->bitsPerPixel<<16) |
-                                          zTileStride;
-    } else {        
-        pSAVAGEDRI->frontBitmapDesc   	= BCI_BD_BW_DISABLE | /* block write disabled */
-                	                  ((pSAVAGEDRI->cpp==2)?
-                        	            BCI_BD_TILE_16:BCI_BD_TILE_32) | /*16/32 bpp tile format */
-                        	          (pScrn->bitsPerPixel<<16) | /* bpp */
-                        	          TileStride; /* stride */
-
-        pSAVAGEDRI->backBitmapDesc      = BCI_BD_BW_DISABLE |
-                                          ((pSAVAGEDRI->cpp==2)?
-                                            BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                                          (pScrn->bitsPerPixel<<16) |
-                                          TileStride;
-
-        pSAVAGEDRI->depthBitmapDesc     = BCI_BD_BW_DISABLE |
-                                          ((pSAVAGEDRI->zpp==2)?
-                                            BCI_BD_TILE_16:BCI_BD_TILE_32) |
-                                          (pScrn->bitsPerPixel<<16) |
-                                          zTileStride;
-   }
-
-   pSAVAGEDRI->frontPitch               = TileStride;
    pSAVAGEDRI->backOffset		= pSAVAGEDRIServer->backOffset;
    pSAVAGEDRI->backbufferSize		= pSAVAGEDRIServer->backbufferSize;
-   pSAVAGEDRI->backbuffer		= psav->FrameBufferBase +
-   					  pSAVAGEDRI->backOffset;
-   pSAVAGEDRI->backPitch		= pSAVAGEDRIServer->backPitch;
 
    pSAVAGEDRI->depthOffset		= pSAVAGEDRIServer->depthOffset;
    pSAVAGEDRI->depthbufferSize		= pSAVAGEDRIServer->depthbufferSize;
-   pSAVAGEDRI->depthbuffer		= psav->FrameBufferBase +
-   					  pSAVAGEDRI->depthOffset;
-   pSAVAGEDRI->depthPitch		= pSAVAGEDRIServer->depthPitch;
-
 
    pSAVAGEDRI->textureOffset	= pSAVAGEDRIServer->textureOffset;
-   pSAVAGEDRI->textures 		= psav->FrameBufferBase +
-   					  pSAVAGEDRI->textureOffset;
-   pSAVAGEDRI->textureSize		= pSAVAGEDRIServer->textureSize;
 
-   i = mylog2( pSAVAGEDRI->textureSize / SAVAGE_NR_TEX_REGIONS );
+   i = mylog2( pSAVAGEDRIServer->textureSize / SAVAGE_NR_TEX_REGIONS );
    if ( i < SAVAGE_LOG_MIN_TEX_REGION_SIZE )
       i = SAVAGE_LOG_MIN_TEX_REGION_SIZE;
 
    pSAVAGEDRI->logTextureGranularity = i;
-   pSAVAGEDRI->textureSize = (pSAVAGEDRI->textureSize >> i) << i; /* truncate */
+   pSAVAGEDRI->textureSize = (pSAVAGEDRIServer->textureSize >> i) << i; /* truncate */
 
-   pSAVAGEDRI->agpTextures.handle = pSAVAGEDRIServer->agpTextures.handle;
-   pSAVAGEDRI->agpTextures.offset = pSAVAGEDRIServer->agpTextures.offset;   
-   pSAVAGEDRI->agpTextures.size = pSAVAGEDRIServer->agpTextures.size;
-   pSAVAGEDRI->agpTextures.map = pSAVAGEDRIServer->agpTextures.map;
+   pSAVAGEDRI->agpTextureHandle = pSAVAGEDRIServer->agpTextures.handle;
 
-   i = mylog2( pSAVAGEDRI->agpTextures.size / SAVAGE_NR_TEX_REGIONS );
+   i = mylog2( pSAVAGEDRIServer->agpTextures.size / SAVAGE_NR_TEX_REGIONS );
    if ( i < SAVAGE_LOG_MIN_TEX_REGION_SIZE )
       i = SAVAGE_LOG_MIN_TEX_REGION_SIZE;
 
    pSAVAGEDRI->logAgpTextureGranularity = i;
-   pSAVAGEDRI->agpTextures.size = (pSAVAGEDRI->agpTextures.size >> i) << i; /* truncate */
+   pSAVAGEDRI->agpTextureSize = (pSAVAGEDRIServer->agpTextures.size >> i) << i; /* truncate */
 
-   pSAVAGEDRI->aperture.handle	= pSAVAGEDRIServer->aperture.handle;
-   pSAVAGEDRI->aperture.size	= pSAVAGEDRIServer->aperture.size;
-   pSAVAGEDRI->aperture.map    = pSAVAGEDRIServer->aperture.map;
+   pSAVAGEDRI->apertureHandle	= pSAVAGEDRIServer->aperture.handle;
+   pSAVAGEDRI->apertureSize	= pSAVAGEDRIServer->aperture.size;
    {
       unsigned int shift = 0;
       
@@ -1419,6 +1432,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset) ); /* back  */
 	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset) ); /* depth */
       } else {
+	    int offset_shift = 5;
       	    if(pSAVAGEDRI->cpp == 2)
       	    {
          	value |=  (((pSAVAGEDRI->width + 0x3F) & 0xFFC0) >> 6) << 20;
@@ -1427,7 +1441,6 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
          	value |=  (((pSAVAGEDRI->width + 0x1F) & 0xFFE0) >> 5) << 20;
          	value |= 3<<30;
       	    }
-	    int offset_shift = 5;
 	    if (psav->Chipset == S3_SUPERSAVAGE) /* supersavages have a different shift */
 		offset_shift = 6;
 	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> offset_shift) ); /* front */
@@ -1436,34 +1449,15 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
       }
    }
    
-   pSAVAGEDRI->registers.handle	= pSAVAGEDRIServer->registers.handle;
-   pSAVAGEDRI->registers.size	= pSAVAGEDRIServer->registers.size;
-   pSAVAGEDRI->registers.map    = pSAVAGEDRIServer->registers.map;
-   
-   pSAVAGEDRI->BCIcmdBuf.handle	= pSAVAGEDRIServer->registers.handle+0x00010000;
-   pSAVAGEDRI->BCIcmdBuf.size	= 0x00020000;
-   pSAVAGEDRI->BCIcmdBuf.map    = (drmAddress)( (unsigned int)
-                                     pSAVAGEDRIServer->registers.map +
-                                     0x00010000);
-   
-   pSAVAGEDRI->status.handle	= pSAVAGEDRIServer->status.handle;
-   pSAVAGEDRI->status.size		= pSAVAGEDRIServer->status.size;
-   pSAVAGEDRI->shadowStatus = psav->ShadowStatus;
+   pSAVAGEDRI->statusHandle	= pSAVAGEDRIServer->status.handle;
+   pSAVAGEDRI->statusSize	= pSAVAGEDRIServer->status.size;
 
-/* no DMA now ....*/
-#if 0
-   pSAVAGEDRI->primary.handle	= pSAVAGEDRIServer->primary.handle;
-   pSAVAGEDRI->primary.size	= pSAVAGEDRIServer->primary.size;
-   pSAVAGEDRI->buffers.handle	= pSAVAGEDRIServer->buffers.handle;
-   pSAVAGEDRI->buffers.size	= pSAVAGEDRIServer->buffers.size;
-#endif
-   
    pSAVAGEDRI->sarea_priv_offset = sizeof(XF86DRISAREARec);
    
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]pSAVAGEDRIServer:\n" );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	reserved_map_agpstart:0x%08x\n",pSAVAGEDRIServer->reserved_map_agpstart); 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	reserved_map_idx:0x%08x\n",pSAVAGEDRIServer->reserved_map_idx);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08lx\n",pSAVAGEDRIServer->sarea_priv_offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08x\n",pSAVAGEDRIServer->sarea_priv_offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	chipset:0x%08x\n",pSAVAGEDRIServer->chipset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sgram:0x%08x\n",pSAVAGEDRIServer->sgram);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontbufferSize:0x%08x\n",pSAVAGEDRIServer->frontbufferSize);  
@@ -1481,23 +1475,23 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logTextureGranularity:0x%08x\n",pSAVAGEDRIServer->logTextureGranularity);
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:handle:0x%08lx\n",pSAVAGEDRIServer->agp.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:offset:0x%08lx\n",pSAVAGEDRIServer->agp.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:size:0x%08lx\n",pSAVAGEDRIServer->agp.size);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:offset:0x%08x\n",pSAVAGEDRIServer->agp.offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:size:0x%08x\n",pSAVAGEDRIServer->agp.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agp.map);
    
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:handle:0x%08lx\n",pSAVAGEDRIServer->registers.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:offset:0x%08lx\n",pSAVAGEDRIServer->registers.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:size:0x%08lx\n",pSAVAGEDRIServer->registers.size);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:offset:0x%08x\n",pSAVAGEDRIServer->registers.offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:size:0x%08x\n",pSAVAGEDRIServer->registers.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->registers.map);
    
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:handle:0x%08lx\n",pSAVAGEDRIServer->status.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:offset:0x%08lx\n",pSAVAGEDRIServer->status.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:size:0x%08lx\n",pSAVAGEDRIServer->status.size);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:offset:0x%08x\n",pSAVAGEDRIServer->status.offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:size:0x%08x\n",pSAVAGEDRIServer->status.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->status.map);
    
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:handle:0x%08lx\n",pSAVAGEDRIServer->agpTextures.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:offset:0x%08lx\n",pSAVAGEDRIServer->agpTextures.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:size:0x%08lx\n",pSAVAGEDRIServer->agpTextures.size);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:offset:0x%08x\n",pSAVAGEDRIServer->agpTextures.offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:size:0x%08x\n",pSAVAGEDRIServer->agpTextures.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apgTextures:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agpTextures.map);
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRIServer->logAgpTextureGranularity); 
@@ -1506,66 +1500,39 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	chipset:0x%08x\n",pSAVAGEDRI->chipset );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	width:0x%08x\n",pSAVAGEDRI->width );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	height:0x%08x\n",pSAVAGEDRI->height );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	mem:0x%08lx\n",pSAVAGEDRI->mem );
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	mem:0x%08x\n",pSAVAGEDRI->mem );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cpp:%d\n",pSAVAGEDRI->cpp );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	zpp:%d\n",pSAVAGEDRI->zpp );
+
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpMode:%d\n",pSAVAGEDRI->agpMode );
+
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	bufferSize:%u\n",pSAVAGEDRI->bufferSize );
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontbuffer:0x%08lx\n",pSAVAGEDRI->frontbuffer);  
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontbufferSize:0x%08x\n",pSAVAGEDRI->frontbufferSize);  
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontOffset:0x%08x\n",pSAVAGEDRI->frontOffset );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontPitch:0x%08x\n",pSAVAGEDRI->frontPitch );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	frontBitmapDesc:0x%08lx\n",pSAVAGEDRI->frontBitmapDesc );
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	backbuffer:0x%08lx\n",pSAVAGEDRI->backbuffer);  
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	backbufferSize:0x%08x\n",pSAVAGEDRI->backbufferSize);     
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	backOffset:0x%08x\n",pSAVAGEDRI->backOffset );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	backPitch:0x%08x\n",pSAVAGEDRI->backPitch );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	backBitmapDesc:0x%08lx\n",pSAVAGEDRI->backBitmapDesc );
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	depthbuffer:0x%08lx\n",pSAVAGEDRI->depthbuffer);  
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	depthbufferSize:0x%08x\n",pSAVAGEDRI->depthbufferSize);  
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	depthOffset:0x%08x\n",pSAVAGEDRI->depthOffset );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	depthPitch:0x%08x\n",pSAVAGEDRI->depthPitch );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	depthBitmapDesc:0x%08lx\n",pSAVAGEDRI->depthBitmapDesc );
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textures:0x%08lx\n",pSAVAGEDRI->textures );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textureOffset:0x%08x\n",pSAVAGEDRI->textureOffset );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textureSize:0x%08x\n",pSAVAGEDRI->textureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logTextureGranularity:0x%08x\n",pSAVAGEDRI->logTextureGranularity );
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpBufferOffset:0x%08x\n",pSAVAGEDRI->agpBufferOffset );
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureOffset:0x%08x\n",pSAVAGEDRI->agpTextureOffset );
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureHandle:0x%08x\n",pSAVAGEDRI->agpTextureHandle );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureSize:0x%08x\n",pSAVAGEDRI->agpTextureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRI->logAgpTextureGranularity );
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:handle:0x%08lx\n",pSAVAGEDRI->agpTextures.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:offset:0x%08lx\n",pSAVAGEDRI->agpTextures.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:size:0x%08lx\n",pSAVAGEDRI->agpTextures.size);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apgTextures:map:0x%08lx\n",(unsigned long)pSAVAGEDRI->agpTextures.map);
-
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:handle:0x%08lx\n",pSAVAGEDRI->registers.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:offset:0x%08lx\n",pSAVAGEDRI->registers.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:size:0x%08lx\n",pSAVAGEDRI->registers.size);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:map:0x%08lx\n",(unsigned long)pSAVAGEDRI->registers.map);
-
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperture:handle:0x%08lx\n",pSAVAGEDRI->aperture.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperture:offset:0x%08lx\n",pSAVAGEDRI->aperture.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperture:size:0x%08lx\n",pSAVAGEDRI->aperture.size);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperture:map:0x%08lx\n",(unsigned long)pSAVAGEDRI->aperture.map);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apertureHandle:0x%08lx\n",pSAVAGEDRI->apertureHandle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apertureSize:0x%08x\n",pSAVAGEDRI->apertureSize);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperturePitch:0x%08x\n",pSAVAGEDRI->aperturePitch);
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	BCIcmdBuf:handle:0x%08lx\n",pSAVAGEDRI->BCIcmdBuf.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	BCIcmdBuf:offset:0x%08lx\n",pSAVAGEDRI->BCIcmdBuf.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	BCIcmdBuf:size:0x%08lx\n",pSAVAGEDRI->BCIcmdBuf.size);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	BCIcmdBuf:map:0x%08lx\n",(unsigned long)pSAVAGEDRI->BCIcmdBuf.map);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	statusHandle:0x%08lx\n",pSAVAGEDRI->statusHandle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	statusSize:0x%08x\n",pSAVAGEDRI->statusSize);
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:handle:0x%08lx\n",pSAVAGEDRI->status.handle);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:offset:0x%08lx\n",pSAVAGEDRI->status.offset);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:size:0x%08lx\n",pSAVAGEDRI->status.size);
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:map:0x%08lx\n",(unsigned long)pSAVAGEDRI->status.map);
-
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08lx\n",pSAVAGEDRI->sarea_priv_offset);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08x\n",pSAVAGEDRI->sarea_priv_offset);
     
    return TRUE;
 }
@@ -1668,12 +1635,13 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
 void
 SAVAGEDRIInitBuffers(WindowPtr pWin, RegionPtr prgn, CARD32 index)
 {
+#if 0
     ScreenPtr pScreen = pWin->drawable.pScreen;
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
     BoxPtr pbox = REGION_RECTS(prgn);
     int nbox  = REGION_NUM_RECTS(prgn);
-
+#endif
 
 #if 0
     CHECK_DMA_QUIESCENT(SAVPTR(pScrn), pScrn);
@@ -2071,8 +2039,6 @@ SAVAGEDRICloseFullScreen(ScreenPtr pScreen)
 {
   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
   SavagePtr psav = SAVPTR(pScrn);
-  SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
-  unsigned int depth = pScrn->bitsPerPixel;
   BCI_GET_PTR;
 
   BCI_SEND(0xC0FF0000);
@@ -2116,21 +2082,6 @@ SAVAGEDRICloseFullScreen(ScreenPtr pScreen)
   
   OUTREG(0x48C18, INREG(0x48C18) | 0x8);
   return TRUE;
-}
-/* get the physics address (for shadow status)*/
-unsigned long SAVAGEDRIGetPhyAddress(ScrnInfoPtr pScrn,void * pointer)
-{
-
-  SavagePtr psav = SAVPTR(pScrn);
-
-  drm_savage_get_physcis_address_t req;
-  int ret;
-
-  req.v_address = (unsigned long )pointer;
-  ret = ioctl(psav->drmFD, DRM_IOCTL_SAVAGE_GET_PHYSICS_ADDRESS,&req);
-  if (ret != 1)
-    fprintf(stderr,"[GetPhyAddress],Wrong virtual address.\n");
-  return req.p_address;
 }
 
 #endif
