@@ -217,7 +217,7 @@ unsigned long readfb( unsigned long addr );
 unsigned long writefb( unsigned long addr, unsigned long value );
 void writescan( unsigned long scan, unsigned long color );
 
-static int GetTileAperturePitch(ulong dwWidth, ulong dwBpp);
+static int GetTileAperturePitch(unsigned long dwWidth, unsigned long dwBpp);
 void SavageSetGBD_M7(ScrnInfoPtr pScrn);            
 void SavageSetGBD_Twister(ScrnInfoPtr pScrn);
 void SavageSetGBD_PM(ScrnInfoPtr pScrn);
@@ -235,7 +235,7 @@ ScrnInfoPtr gpScrn = 0;
  *  if MM850C_15 = 1 (use MS-1 128bit non-linear tile mode),we should do it as follows
  *  we now only support the later, and don't use Y range flag,see tile surface register
 */
-static int GetTileAperturePitch(ulong dwWidth, ulong dwBpp)
+static int GetTileAperturePitch(unsigned long dwWidth, unsigned long dwBpp)
 {
     switch (dwBpp) {
         case 4:
@@ -474,8 +474,8 @@ SavageSetGBD(ScrnInfoPtr pScrn)
 void SavageSetGBD_Twister(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    ulong       ulTmp;
-    uchar byte;
+    unsigned long       ulTmp;
+    unsigned char byte;
     int bci_enable, tile16, tile32;
 
     if (psav->Chipset == S3_SAVAGE4) {
@@ -600,8 +600,8 @@ void SavageSetGBD_Twister(ScrnInfoPtr pScrn)
 
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write - was 0 */
     /* HW uses width */
-    psav->GlobalBD.bd1.HighPart.Stride = (ushort) psav->lDelta / (pScrn->bitsPerPixel >> 3);
-    psav->GlobalBD.bd1.HighPart.Bpp = (uchar) (pScrn->bitsPerPixel);
+    psav->GlobalBD.bd1.HighPart.Stride = (unsigned short) psav->lDelta / (pScrn->bitsPerPixel >> 3);
+    psav->GlobalBD.bd1.HighPart.Bpp = (unsigned char) (pScrn->bitsPerPixel);
     psav->GlobalBD.bd1.Offset = 0;
     
 
@@ -642,8 +642,8 @@ void SavageSetGBD_Twister(ScrnInfoPtr pScrn)
 void SavageSetGBD_M7(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    ulong ulTmp;
-    uchar byte;
+    unsigned long ulTmp;
+    unsigned char byte;
     int bci_enable, tile16, tile32;
 
     bci_enable = BCI_ENABLE;
@@ -859,8 +859,8 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */
     /* HW uses width */
-    psav->GlobalBD.bd1.HighPart.Stride = (ushort)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
-    psav->GlobalBD.bd1.HighPart.Bpp = (uchar) (pScrn->bitsPerPixel);
+    psav->GlobalBD.bd1.HighPart.Stride = (unsigned short)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
+    psav->GlobalBD.bd1.HighPart.Bpp = (unsigned char) (pScrn->bitsPerPixel);
     psav->GlobalBD.bd1.Offset = pScrn->fbOffset;    
 
 
@@ -897,8 +897,8 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
 void SavageSetGBD_PM(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    ulong ulTmp;
-    uchar byte;
+    unsigned long ulTmp;
+    unsigned char byte;
     int bci_enable, tile16, tile32;
     
     /* Is supersavage like savage4 or twister?
@@ -1078,8 +1078,8 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */
     /* HW uses width */
-    psav->GlobalBD.bd1.HighPart.Stride = (ushort)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
-    psav->GlobalBD.bd1.HighPart.Bpp = (uchar) (pScrn->bitsPerPixel);
+    psav->GlobalBD.bd1.HighPart.Stride = (unsigned short)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
+    psav->GlobalBD.bd1.HighPart.Bpp = (unsigned char) (pScrn->bitsPerPixel);
     psav->GlobalBD.bd1.Offset = pScrn->fbOffset;    
 
     /*
@@ -1111,7 +1111,7 @@ void SavageRestoreAccelState(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
     int bci_enable;
-    ulong cmd;
+    unsigned long cmd;
 
     BCI_GET_PTR;
 

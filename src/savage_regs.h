@@ -241,7 +241,7 @@ do {                                    \
  */                                                                 
 #define UnProtectCRTC()                 \
 do {                                    \
-    uchar byte;                          \
+    unsigned char byte;                 \
     OUTREG8(CRT_ADDRESS_REG,0x11);      \
     byte = INREG8(CRT_DATA_REG) & 0X7F; \
     OUTREG16(CRT_ADDRESS_REG,byte << 8 | 0x11); \

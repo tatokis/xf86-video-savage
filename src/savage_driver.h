@@ -52,19 +52,6 @@ typedef struct
   
 } SavageEntRec, *SavageEntPtr;
 
-#ifndef uint
-typedef unsigned int            uint;
-#endif
-#ifndef ulong
-typedef unsigned long           ulong;
-#endif
-#ifndef ushort
-typedef unsigned short          ushort;
-#endif
-#ifndef uchar
-typedef unsigned char           uchar;
-#endif
-
 #define VGAIN8(addr) MMIO_IN8(psav->MapBase+0x8000, addr)
 #define VGAIN16(addr) MMIO_IN16(psav->MapBase+0x8000, addr)
 #define VGAIN(addr) MMIO_IN32(psav->MapBase+0x8000, addr)
@@ -148,19 +135,19 @@ typedef  struct {
 
 /* Bitmap descriptor structures for BCI */
 typedef struct _HIGH {
-    ushort Stride;
-    uchar Bpp;
-    uchar ResBWTile;
+    unsigned short Stride;
+    unsigned char Bpp;
+    unsigned char ResBWTile;
 } HIGH;
 
 typedef struct _BMPDESC1 {
-    ulong Offset;
+    unsigned long Offset;
     HIGH  HighPart;
 } BMPDESC1;
 
 typedef struct _BMPDESC2 {
-    ulong LoPart;
-    ulong HiPart;
+    unsigned long LoPart;
+    unsigned long HiPart;
 } BMPDESC2;
 
 typedef union _BMPDESC {

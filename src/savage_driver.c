@@ -1335,12 +1335,13 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	return FALSE;
     }
     psav->EntityIndex = pEnt->index;
-    
+
+#ifdef XFree86LOADER    
     if (xf86LoadSubModule(pScrn, "vbe")) {
 	xf86LoaderReqSymLists(vbeSymbols, NULL);
 	psav->pVbe = VBEInit(NULL, pEnt->index);
     }
-
+#endif
 
     psav->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
     xf86RegisterResources(pEnt->index, NULL, ResNone);
@@ -4074,7 +4075,7 @@ SavageDDC1(int scrnIndex)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
     SavagePtr psav = SAVPTR(pScrn);
-    uchar byte;
+    unsigned char byte;
     xf86MonPtr pMon;
 
     UnLockExtRegs();
@@ -4136,8 +4137,8 @@ static void
 SavageResetStreams(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    uchar cr67;
-    uchar cr69;
+    unsigned char cr67;
+    unsigned char cr69;
 
     /* disable streams */
     switch (psav->Chipset) {
