@@ -225,7 +225,7 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
 
       i = 0;
       for ( accum = 0 ; accum <= 1 ; accum++ ) {
-         for ( depth = 0 ; depth <= 1 ; depth++ ) { /* and stencil */
+         for ( stencil = 0 ; stencil <= 1 ; stencil++ ) {
             for ( db = 1 ; db >= 0 ; db-- ) {
                pConfigs[i].vid			= -1;
                pConfigs[i].class		= -1;
@@ -233,7 +233,7 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
                pConfigs[i].redSize		= 8;
                pConfigs[i].greenSize		= 8;
                pConfigs[i].blueSize		= 8;
-               pConfigs[i].alphaSize		= 8;
+               pConfigs[i].alphaSize		= 0;
                pConfigs[i].redMask		= 0x00FF0000;
                pConfigs[i].greenMask		= 0x0000FF00;
                pConfigs[i].blueMask		= 0x000000FF;
@@ -256,12 +256,12 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
 	       }
                pConfigs[i].stereo		= FALSE;
                pConfigs[i].bufferSize		= 32;
-               if ( depth ) {
+               if ( stencil ) {
 		     pConfigs[i].depthSize	= 24;
                      pConfigs[i].stencilSize	= 8;
                }
                else {
-                     pConfigs[i].depthSize	= 0;
+                     pConfigs[i].depthSize	= 24;
                      pConfigs[i].stencilSize	= 0;
                }
                pConfigs[i].auxBuffers		= 0;
@@ -269,9 +269,9 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
                if ( accum ) {
                   pConfigs[i].visualRating	= GLX_SLOW_VISUAL_EXT;
                } else {
-                  pConfigs[i].visualRating	= GLX_NONE_EXT;
+                  pConfigs[i].visualRating	= GLX_NONE;
 	       }
-               pConfigs[i].transparentPixel	= 0;
+               pConfigs[i].transparentPixel	= GLX_NONE;
                pConfigs[i].transparentRed	= 0;
                pConfigs[i].transparentGreen	= 0;
                pConfigs[i].transparentBlue	= 0;
