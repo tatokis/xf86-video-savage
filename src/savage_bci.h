@@ -112,6 +112,8 @@
 #define BCI_BD_GET_STRIDE(bd)        ((bd) & 0xFFFF)
 #define BCI_BD_SET_STRIDE(bd, st)    ((bd) |= ((st) & 0xFFFF))
 
+#define BCI_SET_REGISTER             0x96000000
+
 #define BCI_W_H(w, h)                ((((h) << 16) | (w)) & 0x0FFF0FFF)
 #define BCI_X_Y(x, y)                ((((y) << 16) | (x)) & 0x0FFF0FFF)
 #define BCI_X_W(x, y)                ((((w) << 16) | (x)) & 0x0FFF0FFF)

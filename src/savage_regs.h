@@ -159,8 +159,20 @@ enum S3CHIPTAGS {
 #define S3_SEC_BD_LOW                      0X8178
 #define S3_SEC_BD_HIGH                     0X817c
 
+/* duoview */
+
 #define SELECT_IGA1                 0x4026
 #define SELECT_IGA2_READS_WRITES    0x4f26
+
+#define SelectIGA1()                 \
+do {                                    \
+    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1); \
+} while (0)
+
+#define SelectIGA2()                 \
+do {                                    \
+    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES); \
+} while (0)
 
 #define MEM_PS1                     0x10    /*CRCA_4 :Primary stream 1*/
 #define MEM_PS2                     0x20    /*CRCA_5 :Primary stream 2*/

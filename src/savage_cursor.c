@@ -120,13 +120,22 @@ SavageHWCursorInit(ScreenPtr pScreen)
     return xf86InitCursor(pScreen, infoPtr);
 }
 
-
+/*
+ * Supposedly bit 2 of CR45 enables cursor two (rest of the cursor regs are shadowed via SR26), 
+ * but I can't seem to enable it. For now it's disabled. - AGD
+ */
 
 void
 SavageShowCursor(ScrnInfoPtr pScrn)
 {
+    SavagePtr psav = SAVPTR(pScrn);
+
    /* Turn cursor on. */
-   outCRReg( 0x45, inCRReg(0x45) | 0x01 );
+   if (psav->IsSecondary) {
+       outCRReg( 0x45, inCRReg(0x45) | 0x04 ); /* cursor2 bit 2*/
+   } else {
+       outCRReg( 0x45, inCRReg(0x45) | 0x01 );
+   }
    SAVPTR(pScrn)->hwc_on = TRUE;
 }
 
@@ -134,13 +143,19 @@ SavageShowCursor(ScrnInfoPtr pScrn)
 void
 SavageHideCursor(ScrnInfoPtr pScrn)
 {
+    SavagePtr psav = SAVPTR(pScrn);
+
     /* Turn cursor off. */
 
     if( S3_SAVAGE4_SERIES( SAVPTR(pScrn)->Chipset ) )
     {
        waitHSync(5);
     }
-    outCRReg( 0x45, inCRReg(0x45) & 0xfe );
+    if (psav->IsSecondary) {
+	outCRReg( 0x45, inCRReg(0x45) & 0xfb ); /* cursor2 */
+    } else {
+        outCRReg( 0x45, inCRReg(0x45) & 0xfe );
+    }
     SAVPTR(pScrn)->hwc_on = FALSE;
 }
 
@@ -152,8 +167,16 @@ SavageLoadCursorImage(
     SavagePtr psav = SAVPTR(pScrn);
 
     /* Set cursor location in frame buffer.  */
-    outCRReg( 0x4d, (0xff & (CARD32)psav->CursorKByte));
-    outCRReg( 0x4c, (0xff00 & (CARD32)psav->CursorKByte) >> 8);
+    if (psav->IsSecondary) {
+	SelectIGA2();
+    	/* Set cursor location in frame buffer.  */
+    	outCRReg( 0x4d, (0xff & psav->CursorKByte));
+    	outCRReg( 0x4c, (0xff00 & psav->CursorKByte) >> 8);
+	SelectIGA1();
+    } else {
+        outCRReg( 0x4d, (0xff & (CARD32)psav->CursorKByte));
+        outCRReg( 0x4c, (0xff00 & (CARD32)psav->CursorKByte) >> 8);
+    }
 
     /* Upload the cursor image to the frame buffer. */
     memcpy(psav->FBBase + psav->CursorKByte * 1024, src, 1024);
@@ -174,6 +197,7 @@ SavageSetCursorPosition(
      int x, 
      int y)
 {
+    SavagePtr psav = SAVPTR(pScrn);
     unsigned char xoff, yoff;
 
     if( S3_SAVAGE4_SERIES( SAVPTR(pScrn)->Chipset ) )
@@ -210,12 +234,23 @@ SavageSetCursorPosition(
     }
 
     /* This is the recomended order to move the cursor */
-    outCRReg( 0x46, (x & 0xff00)>>8 );
-    outCRReg( 0x47, (x & 0xff) );
-    outCRReg( 0x49, (y & 0xff) );
-    outCRReg( 0x4e, xoff );
-    outCRReg( 0x4f, yoff );
-    outCRReg( 0x48, (y & 0xff00)>>8 );
+        if (psav->IsSecondary) {
+	SelectIGA2();
+    	outCRReg( 0x46, (x & 0xff00)>>8 );
+    	outCRReg( 0x47, (x & 0xff) );
+    	outCRReg( 0x49, (y & 0xff) );
+    	outCRReg( 0x4e, xoff );
+    	outCRReg( 0x4f, yoff );
+    	outCRReg( 0x48, (y & 0xff00)>>8 );
+	SelectIGA1();
+    } else {
+        outCRReg( 0x46, (x & 0xff00)>>8 );
+        outCRReg( 0x47, (x & 0xff) );
+        outCRReg( 0x49, (y & 0xff) );
+        outCRReg( 0x4e, xoff );
+        outCRReg( 0x4f, yoff );
+        outCRReg( 0x48, (y & 0xff00)>>8 );
+    }
 }
 
 
@@ -243,19 +278,36 @@ SavageSetCursorColors(
 	) 
     {
 	/* Do it straight, full 24 bit color. */
-      
-	/* Reset the cursor color stack pointer */
-	inCRReg(0x45);
-	/* Write low, mid, high bytes - foreground */
-	outCRReg(0x4a, fg);
-	outCRReg(0x4a, fg >> 8);
-	outCRReg(0x4a, fg >> 16);
-	/* Reset the cursor color stack pointer */
-	inCRReg(0x45);
-	/* Write low, mid, high bytes - background */
-	outCRReg(0x4b, bg);
-	outCRReg(0x4b, bg >> 8);
-	outCRReg(0x4b, bg >> 16);
+       if (psav->IsSecondary) {
+            /* cursor 2 */
+	    /* Reset the cursor color stack pointer */
+	    inCRReg(0x45);
+	    SelectIGA2();
+	    /* Write low, mid, high bytes - foreground */
+	    outCRReg(0x4a, fg);
+	    outCRReg(0x4a, fg >> 8);
+	    outCRReg(0x4a, fg >> 16);
+	    /* Reset the cursor color stack pointer */
+	    inCRReg(0x45);
+	    /* Write low, mid, high bytes - background */
+	    outCRReg(0x4b, bg);
+	    outCRReg(0x4b, bg >> 8);
+	    outCRReg(0x4b, bg >> 16);
+	    SelectIGA1();
+	} else {      
+	    /* Reset the cursor color stack pointer */
+	    inCRReg(0x45);
+	    /* Write low, mid, high bytes - foreground */
+	    outCRReg(0x4a, fg);
+	    outCRReg(0x4a, fg >> 8);
+	    outCRReg(0x4a, fg >> 16);
+	    /* Reset the cursor color stack pointer */
+	    inCRReg(0x45);
+	    /* Write low, mid, high bytes - background */
+	    outCRReg(0x4b, bg);
+	    outCRReg(0x4b, bg >> 8);
+	    outCRReg(0x4b, bg >> 16);
+	}
 	return;
     }
 #if 0

@@ -31,6 +31,8 @@
 #include "savage_dri.h"
 #endif
 
+extern int gSavageEntityIndex;
+
 /* Forward declaration of functions used in the driver */
 
 static void SavageSetupForScreenToScreenCopy(
@@ -663,24 +665,35 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
      *  = 0  standard VGA address and stride registers
      *       are used to control the primary streams
      */
-    OUTREG8(CRT_ADDRESS_REG,0x67); 
-    byte =  INREG8(CRT_DATA_REG) | 0x08;
-    OUTREG8(CRT_DATA_REG,byte);
-    
-    /* IGA 2 */
-    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
+    if (psav->IsPrimary) {
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
+    } else if (psav->IsSecondary) {
+    	/* IGA 2 */
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
 
-    OUTREG8(CRT_ADDRESS_REG,0x67); 
-    byte =  INREG8(CRT_DATA_REG) | 0x08;
-    OUTREG8(CRT_DATA_REG,byte);
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
              
-    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
-
-#if 0
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
+    } else {
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
+    	/* IGA 2 */
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);             
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
+    }
     /* Set primary stream to bank 0 */
     OUTREG8(CRT_ADDRESS_REG, MEMORY_CTRL0_REG);/* CRCA */
     byte =  INREG8(CRT_DATA_REG) & ~(MEM_PS1 + MEM_PS2) ;
     OUTREG8(CRT_DATA_REG,byte);
+#if 0
     /*
      * if we have 8MB of frame buffer here then we must really be a 16MB
      * card and that means that the second device is always in the upper
@@ -694,11 +707,19 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
 #endif
 
     /* MM81C0 and 81C4 are used to control primary stream. */
-    OUTREG32(PRI_STREAM_FBUF_ADDR0,0x00000000);
-    OUTREG32(PRI_STREAM_FBUF_ADDR1,0x00000000);
-    OUTREG32(PRI_STREAM2_FBUF_ADDR0,0x00000000);
-    OUTREG32(PRI_STREAM2_FBUF_ADDR1,0x00000000);
-
+    if (psav->IsPrimary) {
+    	OUTREG32(PRI_STREAM_FBUF_ADDR0,pScrn->fbOffset & 0x7fffff);
+    	OUTREG32(PRI_STREAM_FBUF_ADDR1,pScrn->fbOffset & 0x7fffff);
+    } else if (psav->IsSecondary) {
+    	OUTREG32(PRI_STREAM2_FBUF_ADDR0,pScrn->fbOffset & 0x7fffff);
+    	OUTREG32(PRI_STREAM2_FBUF_ADDR1,pScrn->fbOffset & 0x7fffff);
+    } else {
+    	OUTREG32(PRI_STREAM_FBUF_ADDR0,pScrn->fbOffset & 0x7fffff);
+    	OUTREG32(PRI_STREAM_FBUF_ADDR1,pScrn->fbOffset & 0x7fffff);
+    	OUTREG32(PRI_STREAM2_FBUF_ADDR0,pScrn->fbOffset & 0x7fffff);
+    	OUTREG32(PRI_STREAM2_FBUF_ADDR1,pScrn->fbOffset & 0x7fffff);
+    }
+ 
     /*
      *  Program Primary Stream Stride Register.
      *
@@ -710,28 +731,59 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
      *  bytes padded up to an even number of tilewidths.
      */
     if (!psav->bTiled) {
-        OUTREG32(PRI_STREAM_STRIDE,
+ 	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
                  (psav->lDelta & 0x00003fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+	} else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
                  (psav->lDelta & 0x00003fff));
+	} else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
+                 (psav->lDelta & 0x00003fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
+                 (psav->lDelta & 0x00003fff));
+	}
+
     } else if (pScrn->bitsPerPixel == 16) {
         /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
-        OUTREG32(PRI_STREAM_STRIDE,
+	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0x80000000 | (psav->lDelta & 0x00003fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+        } else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0x80000000 | (psav->lDelta & 0x00003fff));
-        
+        } else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0x80000000 | (psav->lDelta & 0x00003fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0x80000000 | (psav->lDelta & 0x00003fff));
+	}
+
     } else if (pScrn->bitsPerPixel == 32) {
-        OUTREG32(PRI_STREAM_STRIDE,
+	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0xC0000000 | (psav->lDelta & 0x00003fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+	} else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0xC0000000 | (psav->lDelta & 0x00003fff));
+	} else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0xC0000000 | (psav->lDelta & 0x00003fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0xC0000000 | (psav->lDelta & 0x00003fff));
+	}
     }
 
     OUTREG32(0x8128, 0xFFFFFFFFL);
@@ -790,20 +842,26 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile16;/* 16 bit */
 
             ulTmp =  ((psav->lDelta / 2) >> 6) << 24;
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16);
+	if (psav->IsSecondary)
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP16 | pScrn->fbOffset);
+	else 
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16 | pScrn->fbOffset);
     }
     else if (pScrn->bitsPerPixel == 32) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile32;/* 32 bit */
      
             ulTmp =  ((psav->lDelta / 4) >> 5) << 24;        
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32);
+	if (psav->IsSecondary)
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP32 | pScrn->fbOffset);
+	else 
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32 | pScrn->fbOffset);
     }
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */
     /* HW uses width */
     psav->GlobalBD.bd1.HighPart.Stride = (ushort)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
     psav->GlobalBD.bd1.HighPart.Bpp = (uchar) (pScrn->bitsPerPixel);
-    psav->GlobalBD.bd1.Offset = 0;    
+    psav->GlobalBD.bd1.Offset = pScrn->fbOffset;    
 
 
     /*
@@ -811,8 +869,13 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
      *       bit 0 = 1, Enable 8 Mbytes of display memory thru 64K window
      *                  at A000:0.
      */
+#if 0
     OUTREG8(CRT_ADDRESS_REG,MEMORY_CONFIG_REG); /* cr31 */
     byte = INREG8(CRT_DATA_REG) & (~(ENABLE_CPUA_BASE_A0000));
+    OUTREG8(CRT_DATA_REG,byte);
+#endif
+    OUTREG8(CRT_ADDRESS_REG,MEMORY_CONFIG_REG); /* cr31 */
+    byte = (INREG8(CRT_DATA_REG) | 0x04) & 0xFE;
     OUTREG8(CRT_DATA_REG,byte);
 
     /* program the GBD and SBD's */
@@ -860,18 +923,32 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
      *  = 0  standard VGA address and stride registers
      *       are used to control the primary streams
      */
-    OUTREG8(CRT_ADDRESS_REG,0x67); 
-    byte =  INREG8(CRT_DATA_REG) | 0x08;
-    OUTREG8(CRT_DATA_REG,byte);
-    
-    /* IGA 2 */
-    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
+    if (psav->IsPrimary) {
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
+    } else if (psav->IsSecondary) {
+    	/* IGA 2 */
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
 
-    OUTREG8(CRT_ADDRESS_REG,0x67); 
-    byte =  INREG8(CRT_DATA_REG) | 0x08;
-    OUTREG8(CRT_DATA_REG,byte);
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
     
-    OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
+    } else {
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
+    	/* IGA 2 */
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA2_READS_WRITES);
+
+    	OUTREG8(CRT_ADDRESS_REG,0x67); 
+    	byte =  INREG8(CRT_DATA_REG) | 0x08;
+    	OUTREG8(CRT_DATA_REG,byte);
+    
+    	OUTREG16(SEQ_ADDRESS_REG,SELECT_IGA1);
+    }
 
     /*
      * load ps1 active registers as determined by MM81C0/81C4
@@ -892,37 +969,73 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
      *  bytes padded up to an even number of tilewidths.
      */
     if (!psav->bTiled) {
-        OUTREG32(PRI_STREAM_STRIDE,
+	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
                  (psav->lDelta & 0x00001fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+	} else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
                  (psav->lDelta & 0x00001fff));
+	} else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
+                 (psav->lDelta & 0x00001fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
+                 (psav->lDelta & 0x00001fff));
+	}
     } else if (pScrn->bitsPerPixel == 16) {
         /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
-        OUTREG32(PRI_STREAM_STRIDE,
+	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0x80000000 | (psav->lDelta & 0x00001fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+	} else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0x80000000 | (psav->lDelta & 0x00001fff));
+	} else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0x80000000 | (psav->lDelta & 0x00001fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0x80000000 | (psav->lDelta & 0x00001fff));
+	}
         
     } else if (pScrn->bitsPerPixel == 32) {
-        OUTREG32(PRI_STREAM_STRIDE,
+	if (psav->IsPrimary) {
+            OUTREG32(PRI_STREAM_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0xC0000000 | (psav->lDelta & 0x00001fff));
-        OUTREG32(PRI_STREAM2_STRIDE,
+	} else if (psav->IsSecondary) {
+            OUTREG32(PRI_STREAM2_STRIDE,
                  (((psav->lDelta * 2) << 16) & 0x3FFF0000)
                  | 0xC0000000 | (psav->lDelta & 0x00001fff));
+	} else {
+            OUTREG32(PRI_STREAM_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
+            OUTREG32(PRI_STREAM2_STRIDE,
+                 (((psav->lDelta * 2) << 16) & 0x3FFF0000)
+                 | 0xC0000000 | (psav->lDelta & 0x00001fff));
+	}
     }
     
     /* MM81C0 and 81C4 are used to control primary stream. */
-    /*OUTREG32(PRI_STREAM_FBUF_ADDR0,0x80000000);*/
-    OUTREG32(PRI_STREAM_FBUF_ADDR0,0x00000000);
-    OUTREG32(PRI_STREAM_FBUF_ADDR1,0x00000000);
-    /*OUTREG32(PRI_STREAM2_FBUF_ADDR0,0x80000000);*/
-    OUTREG32(PRI_STREAM2_FBUF_ADDR0,0x00000000);
-    OUTREG32(PRI_STREAM2_FBUF_ADDR1,0x00000000);
+    if (psav->IsPrimary) {
+        OUTREG32(PRI_STREAM_FBUF_ADDR0,pScrn->fbOffset);
+        OUTREG32(PRI_STREAM_FBUF_ADDR1,0x80000000);
+    } else if (psav->IsSecondary) {
+        OUTREG32(PRI_STREAM2_FBUF_ADDR0,(pScrn->fbOffset & 0xfffffffc) | 0x80000000);
+        OUTREG32(PRI_STREAM2_FBUF_ADDR1,pScrn->fbOffset & 0xffffffc);
+    } else {
+        OUTREG32(PRI_STREAM_FBUF_ADDR0,pScrn->fbOffset);
+        OUTREG32(PRI_STREAM_FBUF_ADDR1,0x80000000);
+        OUTREG32(PRI_STREAM2_FBUF_ADDR0,(pScrn->fbOffset & 0xfffffffc) | 0x80000000);
+        OUTREG32(PRI_STREAM2_FBUF_ADDR1,pScrn->fbOffset & 0xffffffc);
+    }
     
     OUTREG32(0x8128, 0xFFFFFFFFL);
     OUTREG32(0x812C, 0xFFFFFFFFL);
@@ -948,20 +1061,26 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile16;/* tile format destination */
         
         ulTmp =  (((pScrn->virtualX + 0x3f) & 0x0000ffc0) >> 6) << 20;
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16);
+	if (psav->IsSecondary)
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+	else 
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>5)); /* 5 or 6? */
     }
     else if (pScrn->bitsPerPixel == 32) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile32;/* tile format destination */
         
         ulTmp =  (((pScrn->virtualX + 0x1f) & 0x0000ffe0) >> 5) << 20;        
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32);
+	if (psav->IsSecondary)
+            OUTREG32(TILED_SURFACE_REGISTER_1,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>5)); /* 5 or 6? */
+	else 
+            OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>5)); /* 5 or 6? */
     }
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */
     /* HW uses width */
     psav->GlobalBD.bd1.HighPart.Stride = (ushort)(psav->lDelta / (pScrn->bitsPerPixel >> 3));
     psav->GlobalBD.bd1.HighPart.Bpp = (uchar) (pScrn->bitsPerPixel);
-    psav->GlobalBD.bd1.Offset = 0;    
+    psav->GlobalBD.bd1.Offset = pScrn->fbOffset;    
 
     /*
      * CR31, bit 0 = 0, Disable address offset bits(CR6A_6-0).
@@ -980,11 +1099,51 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
     OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
     OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
-    
+
     /* turn on screen */
     OUTREG8(SEQ_ADDRESS_REG,0x01);
     byte = INREG8(SEQ_DATA_REG) & ~0x20;
     OUTREG8(SEQ_DATA_REG,byte);
+}
+
+static
+void SavageRestoreAccelState(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+    int bci_enable;
+    ulong cmd;
+
+    BCI_GET_PTR;
+
+    if (psav->Chipset == S3_SAVAGE_MX)
+    	bci_enable = BCI_ENABLE;
+    else
+	bci_enable = BCI_ENABLE_TWISTER;
+
+    psav->WaitIdleEmpty(psav);
+
+    /* may only need to update the GBD */    
+#if 1
+    psav->WaitQueue(psav, 2);
+
+    cmd = BCI_SET_REGISTER | 0xE0 | (2<<16);
+    BCI_SEND(cmd);
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND((psav->GlobalBD.bd2.HiPart
+                             | bci_enable | S3_LITTLE_ENDIAN | S3_BD64));
+#endif
+#if 0
+    /* program the GBD */
+    OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
+    OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart
+                             | bci_enable | S3_LITTLE_ENDIAN | S3_BD64));
+    OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+#endif
+
+    return;
 }
 
 /* Acceleration init function, sets up pointers to our accelerated functions */
@@ -1039,6 +1198,21 @@ SavageInitAccel(ScreenPtr pScreen)
 	;
 
     xaaptr->Sync = SavageAccelSync;
+
+    if(xf86IsEntityShared(pScrn->entityList[0]))
+    {
+        DevUnion* pPriv;
+        SavageEntPtr pEnt;
+        pPriv = xf86GetEntityPrivate(pScrn->entityList[0],
+                gSavageEntityIndex);
+        pEnt = pPriv->ptr;
+        
+        /*if there are more than one devices sharing this entity, we
+          have to assign this call back, otherwise the XAA will be
+          disabled */
+        if(pEnt->HasSecondary)
+           xaaptr->RestoreAccelState           = SavageRestoreAccelState;
+    }
 
 
     /* ScreenToScreen copies */
@@ -1230,7 +1404,7 @@ SavageInitAccel(ScreenPtr pScreen)
                     pScrn->bitsPerPixel,
                     widthBytes,bufferSize);
 
-        pSAVAGEDRIServer->frontOffset = 0; /* AGD: should probably be pScrn->fbOffset */
+        pSAVAGEDRIServer->frontOffset = pScrn->fbOffset; /* 0 */
         pSAVAGEDRIServer->frontPitch = widthBytes;
 
         /* Try for front, back, depth, and two framebuffers worth of

@@ -35,6 +35,22 @@
 #include "GL/glxint.h"
 #endif
 
+typedef enum {
+    MT_NONE,
+    MT_CRT,
+    MT_LCD,
+    MT_DFP,
+    MT_TV
+} SavageMonitorType;
+
+typedef struct
+{
+    Bool HasSecondary;
+    Bool TvOn;
+    ScrnInfoPtr pSecondaryScrn;
+    ScrnInfoPtr pPrimaryScrn;
+  
+} SavageEntRec, *SavageEntPtr;
 
 #ifndef uint
 typedef unsigned int            uint;
@@ -362,6 +378,16 @@ typedef struct _Savage {
     
     StatInfoRec     StatInfo; /* save the SVGA state */
 
+    /* for dvi option */
+    Bool  dvi;
+
+    SavageMonitorType   DisplayType;
+    /* DuoView stuff */
+    Bool		HasCRTC2;     /* MX, IX, Supersavage */
+    Bool		IsSecondary;  /* second Screen */	
+    Bool		IsPrimary;  /* first Screen */
+    EntityInfoPtr       pEnt;
+
 } SavageRec, *SavagePtr;
 
 /* Video flags. */
@@ -420,6 +446,7 @@ extern void SavageCommonCalcClock(long freq, int min_m, int min_n1,
 			long freq_min, long freq_max,
 			unsigned char *mdiv, unsigned char *ndiv);
 void SavageAdjustFrame(int scrnIndex, int y, int x, int flags);
+void SavageDoAdjustFrame(ScrnInfoPtr pScrn, int y, int x, int crtc2);
 Bool SavageSwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
 
 /* In savage_cursor.c. */
@@ -456,6 +483,8 @@ void SavageSetVESAMode( SavagePtr psav, int n, int Refresh );
 void SavageSetPanelEnabled( SavagePtr psav, Bool active );
 void SavageFreeBIOSModeTable( SavagePtr psav, SavageModeTablePtr* ppTable );
 SavageModeTablePtr SavageGetBIOSModeTable( SavagePtr psav, int iDepth );
+ModeStatus SavageMatchBiosMode(ScrnInfoPtr pScrn,int width,int height,int refresh,
+                              unsigned int *vesaMode,unsigned int *newRefresh);
 
 unsigned short SavageGetBIOSModes( 
     SavagePtr psav,

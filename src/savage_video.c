@@ -235,8 +235,16 @@ SavageClipVWindow(ScrnInfoPtr pScrn)
     if( (psav->Chipset == S3_SAVAGE_MX)  ||
 	(psav->Chipset == S3_SUPERSAVAGE) ||
         (psav->Chipset == S3_SAVAGE2000) ) {
-	OUTREG(SEC_STREAM_WINDOW_SZ, 0);
-  
+	if (psav->IsSecondary) {
+	    OUTREG(SEC_STREAM2_WINDOW_SZ, 0);
+	} else if (psav->IsPrimary) {
+	    OUTREG(SEC_STREAM_WINDOW_SZ, 0);
+	} else {
+	    OUTREG(SEC_STREAM_WINDOW_SZ, 0);
+#if 0
+	    OUTREG(SEC_STREAM2_WINDOW_SZ, 0);
+#endif
+  	}
     } else {
 	OUTREG( SSTREAM_WINDOW_SIZE_REG, 1);
 	OUTREG( SSTREAM_WINDOW_START_REG, 0x03ff03ff);
@@ -252,10 +260,8 @@ void SavageInitVideo(ScreenPtr pScreen)
     int num_adaptors;
 
     xf86ErrorFVerb(XVTRACE,"SavageInitVideo\n");
-    if(
-	S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-	(psav->Chipset == S3_SAVAGE2000)
-    )
+    if (S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
+       (psav->Chipset == S3_SAVAGE2000))
     {
 	newAdaptor = SavageSetupImageVideo(pScreen);
 	SavageInitOffscreenImages(pScreen);
@@ -370,40 +376,137 @@ void SavageSetColorKeyNew(ScrnInfoPtr pScrn)
     blue = (pPriv->colorKey & pScrn->mask.blue) >> pScrn->offset.blue;
 
     if( !pPriv->colorKey ) {
-	OUTREG( SEC_STREAM_CKEY_LOW, 0 );
-	OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
-	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
+	if (psav->IsSecondary) {
+	    OUTREG( SEC_STREAM2_CKEY_LOW, 0 );
+	    OUTREG( SEC_STREAM2_CKEY_UPPER, 0 );
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+	} else if (psav->IsPrimary) {
+	    OUTREG( SEC_STREAM_CKEY_LOW, 0 );
+	    OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+	} else {
+	    OUTREG( SEC_STREAM_CKEY_LOW, 0 );
+	    OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+#if 0
+	    sleep(1);
+	    OUTREG( SEC_STREAM2_CKEY_LOW, 0 );
+	    OUTREG( SEC_STREAM2_CKEY_UPPER, 0 );
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+#endif
+	}
     }
     else {
 	switch (pScrn->depth) {
 	case 8:
-	    OUTREG( SEC_STREAM_CKEY_LOW, 
-		0x47000000 | (pPriv->colorKey & 0xFF) );
-	    OUTREG( SEC_STREAM_CKEY_UPPER,
-		0x47000000 | (pPriv->colorKey & 0xFF) );
+	    if (psav->IsSecondary) {
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER,
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    } else if (psav->IsPrimary) {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER,
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    } else {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER,
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+#if 0
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER,
+		    0x47000000 | (pPriv->colorKey & 0xFF) );
+#endif
+	    }
 	    break;
 	case 15:
-	    OUTREG( SEC_STREAM_CKEY_LOW, 
-		0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
-	    OUTREG( SEC_STREAM_CKEY_UPPER, 
-		0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    if (psav->IsSecondary) {
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    } else if (psav->IsPrimary) {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    } else {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+#if 0
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x45000000 | (red<<19) | (green<<11) | (blue<<3) );
+#endif
+	    }
 	    break;
 	case 16:
-	    OUTREG( SEC_STREAM_CKEY_LOW, 
-		0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
-	    OUTREG( SEC_STREAM_CKEY_UPPER, 
-		0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+	    if (psav->IsSecondary) {
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+	    } else if (psav->IsPrimary) {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+	    } else {
+	    	OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
+	    	OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+#if 0
+	    	OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x46000000 | (red<<19) | (green<<10) | (blue<<3) );
+	    	OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x46020002 | (red<<19) | (green<<10) | (blue<<3) );
+#endif
+	    }
 	    break;
 	case 24:
-	    OUTREG( SEC_STREAM_CKEY_LOW, 
-		0x47000000 | (red<<16) | (green<<8) | (blue) );
-	    OUTREG( SEC_STREAM_CKEY_UPPER, 
-		0x47000000 | (red<<16) | (green<<8) | (blue) );
+	    if (psav->IsSecondary) {
+	        OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	        OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	    } else if (psav->IsPrimary) {
+	        OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	        OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	    } else {
+	        OUTREG( SEC_STREAM_CKEY_LOW, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	        OUTREG( SEC_STREAM_CKEY_UPPER, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+#if 0
+	        OUTREG( SEC_STREAM2_CKEY_LOW, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+	        OUTREG( SEC_STREAM2_CKEY_UPPER, 
+		    0x47000000 | (red<<16) | (green<<8) | (blue) );
+#endif
+	    }
 	    break;
 	}    
 
 	/* We assume destination colorkey */
-	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
+	if (psav->IsSecondary) {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+	} else if (psav->IsPrimary) {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+	} else {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+#if 0
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+#endif
+	}
     }
 }
 
@@ -453,7 +556,7 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     int k1, k2, k3, k4, k5, k6, k7, kb;
     double s = pPriv->saturation / 128.0;
     double h = pPriv->hue * 0.017453292;
-    unsigned long assembly;
+    unsigned long assembly1, assembly2, assembly3;
 
     xf86ErrorFVerb(XVTRACE, "bright %d, contrast %d, saturation %d, hue %d\n",
 	pPriv->brightness, (int)pPriv->contrast, (int)pPriv->saturation, pPriv->hue );
@@ -483,22 +586,39 @@ void SavageSetColorNew( ScrnInfoPtr pScrn )
     k1 = (int)(dk1+0.5) & 0x1ff;
     k2 = (int)(dk2+0.5) & 0x1ff;
     k3 = (int)(dk3+0.5) & 0x1ff;
-    assembly = (k3<<18) | (k2<<9) | k1;
-    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08lx  ", assembly );
-    OUTREG( SEC_STREAM_COLOR_CONVERT1, assembly );
+    assembly1 = (k3<<18) | (k2<<9) | k1;
+    xf86ErrorFVerb(XVTRACE+1, "CC1 = %08lx  ", assembly1 );
 
     k4 = (int)(dk4+0.5) & 0x1ff;
     k5 = (int)(dk5+0.5) & 0x1ff;
     k6 = (int)(dk6+0.5) & 0x1ff;
-    assembly = (k6<<18) | (k5<<9) | k4;
-    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08lx  ", assembly );
-    OUTREG( SEC_STREAM_COLOR_CONVERT2, assembly );
+    assembly2 = (k6<<18) | (k5<<9) | k4;
+    xf86ErrorFVerb(XVTRACE+1, "CC2 = %08lx  ", assembly2 );
 
     k7 = (int)(dk7+0.5) & 0x1ff;
     kb = (int)(dkb+0.5) & 0xffff;
-    assembly = (kb<<9) | k7;
-    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08lx\n", assembly );
-    OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly );
+    assembly3 = (kb<<9) | k7;
+    xf86ErrorFVerb(XVTRACE+1, "CC3 = %08lx\n", assembly3 );
+
+    if (psav->IsSecondary) {
+	OUTREG( SEC_STREAM2_COLOR_CONVERT1, assembly1 );
+	OUTREG( SEC_STREAM2_COLOR_CONVERT2, assembly2 );
+	OUTREG( SEC_STREAM2_COLOR_CONVERT3, assembly3 );
+    } else if (psav->IsPrimary) {
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly1 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly2 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly3 );
+    } else {
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly1 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly2 );
+	OUTREG( SEC_STREAM_COLOR_CONVERT3, assembly3 );
+#if 0
+	sleep(1);
+	OUTREG( SEC_STREAM2_COLOR_CONVERT1, assembly1 );
+	OUTREG( SEC_STREAM2_COLOR_CONVERT2, assembly2 );
+	OUTREG( SEC_STREAM2_COLOR_CONVERT3, assembly3 );
+#endif
+    }
 }
 
 
@@ -976,12 +1096,20 @@ SavageSetBlend(ScrnInfoPtr pScrn, int id)
     SavagePtr psav = SAVPTR(pScrn);
 
     if( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) ||
-        (psav->Chipset == S3_SUPERSAVAGE) ||
         (psav->Chipset == S3_SAVAGE2000) )
     {
-	psav->blendBase = GetBlendForFourCC( id ) << 9;
+	psav->blendBase = GetBlendForFourCC( id );
 	xf86ErrorFVerb(XVTRACE+1,"Format %4.4s, blend is %08x\n", (char*)&id, psav->blendBase );
-	OUTREG( BLEND_CONTROL, psav->blendBase | 0x08 );
+	if (psav->IsSecondary) {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+	} else if (psav->IsPrimary) {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+	} else {
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 9) | 0x08 ));
+#if 0
+	    OUTREG( BLEND_CONTROL, (INREG32(BLEND_CONTROL) | (psav->blendBase << 17) | (8 << 12) ));
+#endif
+	}
     }
     psav->videoFourCC = id;
 }
@@ -1174,11 +1302,11 @@ SavageDisplayVideoNew(
     }
     else
     {
-	if( 
-	    S3_SAVAGE_MOBILE_SERIES(psav->Chipset) &&
+	if ( S3_SAVAGE_MOBILE_SERIES(psav->Chipset) &&
+	    (psav->DisplayType == MT_LCD) &&
 	    !psav->CrtOnly &&
-	    !psav->TvOn
-	) {
+	    !psav->TvOn) 
+	{
 	    drw_w = (drw_w * psav->XExp1)/psav->XExp2 + 1;
 	    drw_h = (drw_h * psav->YExp1)/psav->YExp2 + 1;
 	    dstBox->x1 = (dstBox->x1 * psav->XExp1)/psav->XExp2;
@@ -1187,11 +1315,32 @@ SavageDisplayVideoNew(
 	    dstBox->y1 += psav->displayYoffset;
 	}
 
-	OUTREG(SEC_STREAM_HSCALING, 
-	    ((src_w&0xfff)<<20) | ((65536 * src_w / drw_w) & 0x1FFFF ));
-	/* BUGBUG need to add 00040000 if src stride > 2048 */
-	OUTREG(SEC_STREAM_VSCALING, 
-	    ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
+	if (psav->IsSecondary) {
+	    OUTREG(SEC_STREAM2_HSCALING, 
+	        ((src_w&0xfff)<<20) | ((65536 * src_w / drw_w) & 0x1FFFF ));
+	    /* BUGBUG need to add 00040000 if src stride > 2048 */
+	    OUTREG(SEC_STREAM2_VSCALING, 
+	        ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
+	} else if (psav->IsPrimary) {
+	    OUTREG(SEC_STREAM_HSCALING, 
+	        ((src_w&0xfff)<<20) | ((65536 * src_w / drw_w) & 0x1FFFF ));
+	    /* BUGBUG need to add 00040000 if src stride > 2048 */
+	    OUTREG(SEC_STREAM_VSCALING, 
+	        ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
+	} else {
+	    OUTREG(SEC_STREAM_HSCALING, 
+	        ((src_w&0xfff)<<20) | ((65536 * src_w / drw_w) & 0x1FFFF ));
+	    /* BUGBUG need to add 00040000 if src stride > 2048 */
+	    OUTREG(SEC_STREAM_VSCALING, 
+	        ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
+#if 0
+	    OUTREG(SEC_STREAM2_HSCALING, 
+	        ((src_w&0xfff)<<20) | ((65536 * src_w / drw_w) & 0x1FFFF ));
+	    /* BUGBUG need to add 00040000 if src stride > 2048 */
+	    OUTREG(SEC_STREAM2_VSCALING, 
+	        ((src_h&0xfff)<<20) | ((65536 * src_h / drw_h) & 0x1FFFF ));
+#endif
+	}
     }
 
     /*
@@ -1199,12 +1348,36 @@ SavageDisplayVideoNew(
      * are 2 bytes/pixel.
      */
 
-    OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) 
+    if (psav->IsSecondary) {
+        OUTREG(SEC_STREAM2_FBUF_ADDR0, (offset + (x1>>15)) 
 	   & (0x7ffffff & ~BASE_PAD));
-    OUTREG(SEC_STREAM_STRIDE, pitch & 0xfff );
-    OUTREG(SEC_STREAM_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
-    OUTREG(SEC_STREAM_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+        OUTREG(SEC_STREAM2_STRIDE_LPB, pitch & 0xfff );
+        OUTREG(SEC_STREAM2_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
+        OUTREG(SEC_STREAM2_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
 	   | (dstBox->x2-dstBox->x1) );
+    } else if (psav->IsPrimary) {
+        OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) 
+	   & (0x7ffffff & ~BASE_PAD));
+        OUTREG(SEC_STREAM_STRIDE, pitch & 0xfff );
+        OUTREG(SEC_STREAM_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
+        OUTREG(SEC_STREAM_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+	   | (dstBox->x2-dstBox->x1) );
+    } else {
+        OUTREG(SEC_STREAM_FBUF_ADDR0, (offset + (x1>>15)) 
+	   & (0x7ffffff & ~BASE_PAD));
+        OUTREG(SEC_STREAM_STRIDE, pitch & 0xfff );
+        OUTREG(SEC_STREAM_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
+        OUTREG(SEC_STREAM_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+	   | (dstBox->x2-dstBox->x1) );
+#if 0
+        OUTREG(SEC_STREAM2_FBUF_ADDR0, (offset + (x1>>15)) 
+	   & (0x7ffffff & ~BASE_PAD));
+        OUTREG(SEC_STREAM2_STRIDE_LPB, pitch & 0xfff );
+        OUTREG(SEC_STREAM2_WINDOW_START, ((dstBox->x1+1) << 16) | (dstBox->y1+1) );
+        OUTREG(SEC_STREAM2_WINDOW_SZ, ((dstBox->x2-dstBox->x1) << 16) 
+	   | (dstBox->x2-dstBox->x1) );
+#endif
+    }
 
 #if 0
     /* Set color key on primary. */
@@ -1213,7 +1386,7 @@ SavageDisplayVideoNew(
 #endif
 
     /* Set FIFO L2 on second stream. */
-
+    /* Is CR92 shadowed for crtc2? -- AGD */
     if( pPriv->lastKnownPitch != pitch )
     {
 	unsigned char cr92;
