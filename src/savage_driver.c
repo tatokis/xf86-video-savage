@@ -2341,7 +2341,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 	VGAOUT8(0x3c4, 0x1b);
 	if( (pScrn->bitsPerPixel == 32) && !psav->DGAactive 
 	    && ! psav->FBStart2nd )
-		VGAOUT8(0x3c5, 0x28 );
+		VGAOUT8(0x3c5, 0x18 );
 	else
 		VGAOUT8(0x3c5, 0x00 );
 
@@ -2642,7 +2642,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
     VGAOUT8(0x3c5, restore->SR18);
     VGAOUT8(0x3c4, 0x1b);
     if( psav->DGAactive )
-	VGAOUT8(0x3c5, restore->SR1B & ~0x28);
+	VGAOUT8(0x3c5, restore->SR1B & ~0x18);
     else
 	VGAOUT8(0x3c5, restore->SR1B);
 
@@ -3153,11 +3153,11 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 	| ((psav->FBStart2nd) ? 0 : CMAP_PALETTED_TRUECOLOR);
     
     if (psav->Chipset == S3_SAVAGE4) {
-        if (!xf86HandleColormaps(pScreen, 256, 6, SavageLoadPaletteSavage4,
+        if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits, SavageLoadPaletteSavage4,
 				 NULL, colormapFlags ))
 	    return FALSE;
     } else {
-        if (!xf86HandleColormaps(pScreen, 256, 6, SavageLoadPalette, NULL,
+        if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits, SavageLoadPalette, NULL,
 				 colormapFlags ))
  	    return FALSE;
     }
@@ -3501,8 +3501,10 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	if( pScrn->depth == 24 )
 		new->SR1B |= 0x28;
 */
+
+	/* enable gamma correction */
 	if( pScrn->depth == 24 )
-	    new->SR1B = 0x28;
+	    new->SR1B = 0x18;
 	else
 	    new->SR1B = 0x00;
 
