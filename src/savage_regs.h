@@ -200,6 +200,9 @@ do {                                    \
 #define TILED_SURF_BPP16   0x80000000	/* bits 31-30=10 for 16 bits/pixel */
 #define TILED_SURF_BPP32   0xC0000000  /* bits 31-30=11 for 32 bits/pixel */
 
+#define TILED_SURF_BPP16_2000   0x00000000   /* bit 31=0 for 16 bits/pixel */
+#define TILED_SURF_BPP32_2000   0x80000000  /* bit 31=1 for 32 bits/pixel */
+
 /*
  * CR88_4 =1 : disable block write
  * the "2D" is partly to set this apart from "BLOCK_WRITE_DISABLE"

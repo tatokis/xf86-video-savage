@@ -1347,11 +1347,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 #endif
 
     /* we can use Option "DisableTile TRUE" to disable tile mode */
-    /* savage2000 tile mode is broken. I suspect it uses different tile sizes from other savages */
-    if (psav->Chipset == S3_SAVAGE2000)
-        psav->bDisableTile = TRUE;
-    else
-        psav->bDisableTile = FALSE; 
+    psav->bDisableTile = FALSE; 
     if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_TILE,&psav->bDisableTile)) {
         xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
                    "Option: %s Tile Mode and Program it \n",(psav->bDisableTile?"Disable":"Enable"));
@@ -2673,8 +2669,8 @@ static Bool SavageMapFB(ScrnInfoPtr pScrn)
 	    psav->FBStart = psav->FBBase;
     }
 
-    if (psav->Chipset == S3_SUPERSAVAGE)
-        /* paramount aperture 0 is pci base 2 */
+    if ((psav->Chipset == S3_SUPERSAVAGE) || (psav->Chipset == S3_SAVAGE2000))
+        /* paramount, savage2000 aperture 0 is pci base 2 */
         psav->ApertureBase =  psav->PciInfo->memBase[2];
     else
         psav->ApertureBase = psav->FrameBufferBase + 0x02000000;
@@ -3615,23 +3611,31 @@ SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
 {
     SavagePtr psav = SAVPTR(pScrn);
     DisplayModePtr currentMode = pScrn->currentMode;    
-    int address=0,top=0,left=0;
+    int address=0,top=0,left=0,tile_height,tile_size;
     
-    TRACE(("SavageAdjustFrame(%d,%d,%x)\n", x, y, flags));
-    
+    TRACE(("SavageDoAdjustFrame(%d,%d,%x)\n", x, y, flags));
+
+    if (psav->Chipset == S3_SAVAGE2000) {
+        tile_height = TILEHEIGHT_2000; /* 32 */
+        tile_size = TILE_SIZE_BYTE_2000; /* 4096 */
+    } else {
+        tile_height = TILEHEIGHT; /* 16 */
+        tile_size = TILE_SIZE_BYTE; /* 2048 */
+    }
+
     if (!psav->bTiled) {
         left = x - x % 64;
         top = y;
         address = (top * psav->lDelta) + left * (pScrn->bitsPerPixel >> 3);
         address = (address >> 5) << 5;
     } else {
-        top = y - y % TILEHEIGHT;
+        top = y - y % tile_height;
         if (pScrn->bitsPerPixel == 16) {
             left = x - x % TILEWIDTH_16BPP;
-            address = top * psav->lDelta + left * TILE_SIZE_BYTE / TILEWIDTH_16BPP;
+            address = top * psav->lDelta + left * tile_size / TILEWIDTH_16BPP;
         } else if (pScrn->bitsPerPixel == 32) {
             left = x - x % TILEWIDTH_32BPP;
-            address = top * psav->lDelta + left * TILE_SIZE_BYTE / TILEWIDTH_32BPP;
+            address = top * psav->lDelta + left * tile_size / TILEWIDTH_32BPP;
         }
     }
     
@@ -3665,8 +3669,9 @@ SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
             OUTREG32(PRI_STREAM2_FBUF_ADDR1, address & 0xFFFFFFF8);
 	}
     } else if (psav->Chipset == S3_SAVAGE2000) {
-        OUTREG32(PRI_STREAM_FBUF_ADDR0, 0x80000000);
-        OUTREG32(PRI_STREAM_FBUF_ADDR1, address & 0xFFFFFFF8);
+        /*  certain Y values seems to cause havoc, not sure why */
+        OUTREG32(PRI_STREAM_FBUF_ADDR0, (address & 0xFFFFFFF8));
+        OUTREG32(PRI_STREAM2_FBUF_ADDR0, (address & 0xFFFFFFF8));
     } else {
         OUTREG32(PRI_STREAM_FBUF_ADDR0,address |  0xFFFFFFFC);
         OUTREG32(PRI_STREAM_FBUF_ADDR1,address |  0x80000000);

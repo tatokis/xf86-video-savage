@@ -255,6 +255,30 @@ static int GetTileAperturePitch(unsigned long dwWidth, unsigned long dwBpp)
     }
 }
 
+static int GetTileAperturePitch2000(unsigned long dwWidth, unsigned long dwBpp, int lDelta)
+{
+    switch (dwBpp) {
+        case 4:
+        case 8:
+            return(0x2000);
+            break;
+        case 16:
+	    if (lDelta > 0x800)
+                return(0x1000);
+	    else
+	        return(0x800);
+            break;
+        case 32:
+	    if (lDelta > 0x1000)
+                return(0x2000);
+	    else
+	        return(0x1000);
+            break;
+        default:
+            return(0x2000);
+    }
+}
+
 void
 SavageInitialize2DEngine(ScrnInfoPtr pScrn)
 {
@@ -392,8 +416,12 @@ SavageSetGBD(ScrnInfoPtr pScrn)
         psav->bTiled = TRUE;        
         psav->lDelta = ((psav->lDelta + 127) >> 7) << 7;
             
-        if (psav->Chipset == S3_SAVAGE_MX || psav->Chipset == S3_SAVAGE3D)
-            psav->ulAperturePitch = 0x2000;                            
+        if (psav->Chipset == S3_SAVAGE_MX)
+            psav->ulAperturePitch = 0x2000;
+	else if (psav->Chipset == S3_SAVAGE2000)
+	    psav->ulAperturePitch = GetTileAperturePitch2000(pScrn->virtualX,
+							     pScrn->bitsPerPixel,
+							     psav->lDelta);
         else            
             psav->ulAperturePitch = GetTileAperturePitch(pScrn->virtualX,pScrn->bitsPerPixel);
             
@@ -1254,13 +1282,18 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
 void SavageSetGBD_2000(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    unsigned long ulTmp;
+    unsigned long ulTmp, ulYRange;
     unsigned char byte;
     int bci_enable, tile16, tile32;
     
     bci_enable = BCI_ENABLE_TWISTER;
     tile16 = TILE_DESTINATION;
     tile32 = TILE_DESTINATION;
+
+    if (pScrn->virtualX > 1024)
+      ulYRange = 0x40000000;
+    else
+      ulYRange = 0x20000000;
 
 
     /* following is the enable case */
@@ -1270,25 +1303,11 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     byte = INREG8(SEQ_DATA_REG) | 0x20;
     OUTREG8(SEQ_DATA_REG,byte);
 
-    /*
-     * CR67_3:
-     *  = 1  stream processor MMIO address and stride register
-     *       are used to control the primary stream
-     *  = 0  standard VGA address and stride registers
-     *       are used to control the primary streams
-     */
 
-    OUTREG8(CRT_ADDRESS_REG,0x67); 
-    byte =  INREG8(CRT_DATA_REG) | 0x08;
-    OUTREG8(CRT_DATA_REG,byte);
+    /* MM81C0 and 81B0 are used to control primary stream. */
+    OUTREG32(PRI_STREAM_FBUF_ADDR0, pScrn->fbOffset);
+    OUTREG32(PRI_STREAM2_FBUF_ADDR0, pScrn->fbOffset);
 
-    /*
-     * load ps1 active registers as determined by MM81C0/81C4
-     * load ps2 active registers as determined by MM81B0/81B4
-     */
-    OUTREG8(CRT_ADDRESS_REG,0x65); 
-    byte =  INREG8(CRT_DATA_REG) | 0x03;
-    OUTREG8(CRT_DATA_REG,byte);
 
     /*
      *  Program Primary Stream Stride Register.
@@ -1302,22 +1321,28 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
      */
     if (!psav->bTiled) {
         OUTREG32(PRI_STREAM_STRIDE,
-             (((psav->lDelta * 2) << 16) & 0x3FFF0000) |
-             (psav->lDelta & 0x00001fff));
-    } else if (pScrn->bitsPerPixel == 16) {
-        /* Scanline-length-in-bytes/128-bytes-per-tile * 256 Qwords/tile */
+		 ((psav->lDelta << 4) & 0x7ff0));
+        OUTREG32(PRI_STREAM2_STRIDE,
+                 ((psav->lDelta << 4) & 0x7ff0));
+    } else {
         OUTREG32(PRI_STREAM_STRIDE,
-             (((psav->lDelta * 2) << 16) & 0x3FFF0000)
-             | 0x80000000 | (psav->lDelta & 0x00001fff));
-    } else if (pScrn->bitsPerPixel == 32) {
-        OUTREG32(PRI_STREAM_STRIDE,
-             (((psav->lDelta * 2) << 16) & 0x3FFF0000)
-             | 0xC0000000 | (psav->lDelta & 0x00001fff));
+		 (0x80000000 |((psav->lDelta << 4) & 0x7ff0)));
+        OUTREG32(PRI_STREAM2_STRIDE,
+                 (0x80000000 |((psav->lDelta << 4) & 0x7ff0)));
     }
     
-    /* MM81C0 and 81C4 are used to control primary stream. */
-    OUTREG32(PRI_STREAM_FBUF_ADDR0,pScrn->fbOffset);
-    OUTREG32(PRI_STREAM_FBUF_ADDR1,0x80000000);
+    /*
+     * CR67_3:
+     *  = 1  stream processor MMIO address and stride register
+     *       are used to control the primary stream
+     *  = 0  standard VGA address and stride registers
+     *       are used to control the primary streams
+     */
+
+    OUTREG8(CRT_ADDRESS_REG,0x67); 
+    byte =  INREG8(CRT_DATA_REG) | 0x08;
+    OUTREG8(CRT_DATA_REG,byte);
+
     
     OUTREG32(0x8128, 0xFFFFFFFFL);
     OUTREG32(0x812C, 0xFFFFFFFFL);
@@ -1328,6 +1353,11 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     /* CR50, bit 7,6,0 = 111, Use GBD.*/
     OUTREG8(CRT_ADDRESS_REG,0x50);
     byte = INREG8(CRT_DATA_REG) | 0xC1;
+    OUTREG8(CRT_DATA_REG, byte);
+
+    /* CR73 bit 5 = 0 block write disable */
+    OUTREG8(CRT_ADDRESS_REG,0x73);
+    byte = INREG8(CRT_DATA_REG) & ~0x20;
     OUTREG8(CRT_DATA_REG, byte);
 
     if (!psav->bTiled) {
@@ -1341,13 +1371,19 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     }
     else if (pScrn->bitsPerPixel == 16) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile16;/* tile format destination */
-        ulTmp =  (((pScrn->virtualX + 0x3f) & 0x0000ffc0) >> 6) << 20;
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16 | (pScrn->fbOffset>>6));
+        ulTmp =  (((pScrn->virtualX + 0x3f) & 0x0000ffc0) >> 6) << 23;
+        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP16_2000 | ulYRange);
+        ulTmp |= (TILED_SURF_BPP16_2000 | ulYRange);
+        OUTREG32(PRI_STREAM_STRIDE, ((ulTmp >> 19) & 0x03f0) | 0x80000000);
+        OUTREG32(PRI_STREAM2_STRIDE, ((ulTmp >> 19) & 0x03f0) | 0x80000000);
     }
     else if (pScrn->bitsPerPixel == 32) {
         psav->GlobalBD.bd1.HighPart.ResBWTile = tile32;/* tile format destination */        
-        ulTmp =  (((pScrn->virtualX + 0x1f) & 0x0000ffe0) >> 5) << 20;        
-        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32 | (pScrn->fbOffset>>6));
+        ulTmp =  (((pScrn->virtualX + 0x1f) & 0x0000ffe0) >> 5) << 23;        
+        OUTREG32(TILED_SURFACE_REGISTER_0,ulTmp | TILED_SURF_BPP32_2000 | ulYRange);
+        ulTmp |= (TILED_SURF_BPP32_2000 | ulYRange);
+        OUTREG32(PRI_STREAM_STRIDE, ((ulTmp >> 19) & 0x03f0) | 0x80000000);
+        OUTREG32(PRI_STREAM2_STRIDE, ((ulTmp >> 19) & 0x03f0) | 0x80000000);
     }
     
     psav->GlobalBD.bd1.HighPart.ResBWTile |= 0x10;/* disable block write */

@@ -122,11 +122,13 @@ typedef  struct {
 } savageOverlayRec;
 
 /*  Tiling defines */
-#define TILE_SIZE_BYTE     2048   /* 0x800, 2K */
+#define TILE_SIZE_BYTE          2048   /* 0x800, 2K */
+#define TILE_SIZE_BYTE_2000     4096
 
 #define TILEHEIGHT_16BPP        16
 #define TILEHEIGHT_32BPP        16
 #define TILEHEIGHT              16      /* all 16 and 32bpp tiles are 16 lines high */
+#define TILEHEIGHT_2000         32      /* 32 lines on savage 2000 */
 
 #define TILEWIDTH_BYTES         128     /* 2048/TILEHEIGHT (** not for use w/8bpp tiling) */
 #define TILEWIDTH8BPP_BYTES     64      /* 2048/TILEHEIGHT_8BPP */

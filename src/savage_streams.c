@@ -307,6 +307,9 @@ void SavageInitStreams2000(ScrnInfoPtr pScrn)
 
     OUTREG(PRI_STREAM_BUFFERSIZE,
          pScrn->virtualX * pScrn->virtualY * (pScrn->bitsPerPixel >> 3));
+    OUTREG(PRI_STREAM2_BUFFERSIZE,
+	   pScrn->virtualX * pScrn->virtualY * (pScrn->bitsPerPixel >> 3));
+
 
     if (psav->FBStart2nd) {
 	unsigned long jDelta = pScrn->displayWidth;
