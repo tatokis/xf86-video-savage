@@ -152,6 +152,12 @@ Set AGP data transfer rate.
 4      \-\- x4
 .br
 others \-\- invalid
+.TP
+.BI "Option \*qCrtOnly\*q \*q" boolean \*q  
+This option disables output to the LCD and enables output to the CRT port only.  
+It is useful on laptops if you only want to use the CRT port or to force the CRT 
+output only on desktop cards that use mobile chips. Default: auto-detect active 
+outputs
 .SH FILES
 savage_drv.o
 .SH "SEE ALSO"
