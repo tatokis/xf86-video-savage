@@ -197,6 +197,19 @@
 #define SEC_STREAM_COLOR_CONVERT1_2000       0x819c
 #define SEC_STREAM_COLOR_CONVERT2_2000       0x81e0
 #define SEC_STREAM_COLOR_CONVERT3_2000       0x81e4
+#define SEC_STREAM_SRC_START_2000            0x818c
+#define SEC_STREAM_SRC_SIZE_2000             0x81a8
+#define SEC_STREAM_BUFFERSIZE_2000           0x81a4
+#define S_SRC_H_Mask            0x00000fff
+#define S_SRC_W_Shift           16
+#define S_SRC_W_Mask            0x0fff0000
+#define SRCSIZE(w,h)   (((w <<S_SRC_W_Shift) & S_SRC_W_Mask) | (h & S_SRC_H_Mask))
+#define SRCSTART(x,y)  (((x <<S_SRC_W_Shift) & 0x7ff0000) | (y & 0x000007ff))
+#define VSCALING_2000(h0,h1)   ((unsigned int) (((float)h0/(float)h1) * (float)(65536.0) ))
+#define HSCALING_NORMALIZE(h0,h1)  ((unsigned int) ((float)2048.0 * ((float)h0/ (float)h1))) << 16
+#define HSCALING_2000(w0,w1)   ((unsigned int) (((float)w0/ (float)w1) * (float)(65536.0)))
+#define XY_2000(x,y)      ((((x)<<X_Shift)&X_Mask) | (((y)<<Y_Shift)&Y_Mask))
+#define WH_2000(w,h)      ((((w)<<W_Shift)&W_Mask) | (((h)<<H_Shift)&H_Mask))
 
 #define BASE_PAD 0xf
 

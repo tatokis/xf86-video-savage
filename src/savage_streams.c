@@ -145,6 +145,8 @@ void SavageInitStreamsOld(ScrnInfoPtr pScrn)
         OUTREG(PSTREAM_FBSIZE_REG, 
 		pScrn->virtualY * pScrn->virtualX * (pScrn->bitsPerPixel >> 3));
     }
+
+    OUTREG(FIFO_CONTROL, 0x18ffeL);
     
     OUTREG( PSTREAM_WINDOW_START_REG, OS_XY(0,0) );
     OUTREG( PSTREAM_WINDOW_SIZE_REG, OS_WH(pScrn->displayWidth, pScrn->virtualY) );
@@ -319,10 +321,11 @@ void SavageInitStreams2000(ScrnInfoPtr pScrn)
     }
 
 
-    OUTREG( SEC_STREAM_CKEY_LOW, 0 );
+    OUTREG( SEC_STREAM_CKEY_LOW, (4L << 29) );
     OUTREG( SEC_STREAM_CKEY_UPPER, 0 );
     OUTREG( SEC_STREAM_HSCALING, 0 );
     OUTREG( SEC_STREAM_VSCALING, 0 );
+    OUTREG(SEC_STREAM2_STRIDE_LPB, 0);
     OUTREG( BLEND_CONTROL, 0 );
     OUTREG( SEC_STREAM_FBUF_ADDR0, 0 );
     OUTREG( SEC_STREAM_FBUF_ADDR1, 0 );
@@ -334,11 +337,22 @@ void SavageInitStreams2000(ScrnInfoPtr pScrn)
     OUTREG( SEC_STREAM_OPAQUE_OVERLAY, 0 );
     OUTREG( SEC_STREAM_STRIDE, 0 );
 
+    /* FIFO related regs */
+    OUTREG8(CRT_ADDRESS_REG,0x86);
+    OUTREG8(CRT_DATA_REG,0x2c);
+
+    OUTREG8(CRT_ADDRESS_REG,0x87);
+    OUTREG8(CRT_DATA_REG,0xf8);
+
+    OUTREG8(CRT_ADDRESS_REG,0x89);
+    OUTREG8(CRT_DATA_REG,0x40);
+
+
     /* These values specify brightness, contrast, saturation and hue. */
-    OUTREG( SEC_STREAM_COLOR_CONVERT0_2000, 0x0000C892 );
-    OUTREG( SEC_STREAM_COLOR_CONVERT1_2000, 0x00033400 );
-    OUTREG( SEC_STREAM_COLOR_CONVERT2_2000, 0x000001CF );
-    OUTREG( SEC_STREAM_COLOR_CONVERT3_2000, 0x01F1547E );
+    OUTREG( SEC_STREAM_COLOR_CONVERT0_2000, 0x640092 /*0x0000C892*/ );
+    OUTREG( SEC_STREAM_COLOR_CONVERT1_2000, 0x19a0000 /*0x00033400*/ );
+    OUTREG( SEC_STREAM_COLOR_CONVERT2_2000, 0x001cf /*0x000001CF*/ );
+    OUTREG( SEC_STREAM_COLOR_CONVERT3_2000, 0xF8CA007E /*0x01F1547E*/ );
 
 }
 
@@ -384,10 +398,10 @@ void PatchEnableSPofPanel(ScrnInfoPtr pScrn)
     }
                                                                                                                     
     VerticalRetraceWait();
-                                                                                                                    
+                                                                          
     OUTREG8(CRT_ADDRESS_REG,0x67);
     OUTREG8(CRT_DATA_REG,(INREG8(CRT_DATA_REG)&0xf3)|0x04);
-                                                                                                                    
+
     OUTREG8(CRT_ADDRESS_REG,0x65);
     OUTREG8(CRT_DATA_REG,INREG8(CRT_DATA_REG)|0xC0);
                                                                                                                     
@@ -396,8 +410,10 @@ void PatchEnableSPofPanel(ScrnInfoPtr pScrn)
     } else {
         OUTREG32(PSTREAM_CONTROL_REG,0x02000000);
     }
+
     OUTREG32(PSTREAM_WINDOW_SIZE_REG, 0x0);
-                                                                                                                    
+    /*OUTREG32(PSTREAM_WINDOW_SIZE_REG, OS_WH(pScrn->displayWidth, pScrn->virtualY));*/
+
 }
 
 
