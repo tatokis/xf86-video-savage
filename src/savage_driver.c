@@ -31,6 +31,7 @@
 #ifdef XF86DRI
 #define _XF86DRI_SERVER_
 #include "savage_dri.h"
+#include "savage_sarea.h"
 #endif
 
 
@@ -2025,6 +2026,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
 #ifdef XF86DRI
     SavagePtr psav= SAVPTR(pScrn);
     ScreenPtr pScreen;
+    SAVAGESAREAPrivPtr pSAREAPriv;
 #endif
 
     TRACE(("SavageEnterVT(%d)\n", flags));
@@ -2035,6 +2037,10 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
 #ifdef XF86DRI
     if (psav->directRenderingEnabled) {
         pScreen = screenInfo.screens[scrnIndex];
+	pSAREAPriv = (SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
+	/* Assume that 3D state was clobbered, invalidate it by
+	 * changing ctxOwner in the sarea. */
+	pSAREAPriv->ctxOwner = DRIGetContext(pScreen);
         DRIUnlock(pScreen);
         psav->LockHeld = 0;
     }
