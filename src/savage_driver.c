@@ -3341,10 +3341,6 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
     }
 #endif
 
-    if (psav->pVbe)
-      vbeFree(psav->pVbe);
-    psav->pVbe = NULL;
-
     if( psav->AccelInfoRec ) {
         XAADestroyInfoRec( psav->AccelInfoRec );
 	psav->AccelInfoRec = NULL;
@@ -3363,6 +3359,10 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
 	vgaHWLock(hwp);
 	SavageUnmapMem(pScrn, 0);
     }
+
+    if (psav->pVbe)
+      vbeFree(psav->pVbe);
+    psav->pVbe = NULL;
 
     pScrn->vtSema = FALSE;
     pScreen->CloseScreen = psav->CloseScreen;
