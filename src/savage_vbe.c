@@ -164,7 +164,7 @@ SavageSetVESAMode( SavagePtr psav, int n, int Refresh )
 	SavageClearVM86Regs( psav->pVbe->pInt10 );
 	psav->pVbe->pInt10->ax = 0x4f14;	/* S3 extensions */
 	psav->pVbe->pInt10->bx = 0x0003;	/* set active devices */
-	psav->pVbe->pInt10->cx = psav->PAL ? 0x08 : 0x04;
+	psav->pVbe->pInt10->cx = psav->iDevInfo;
 	xf86ExecX86int10( psav->pVbe->pInt10 );
 
 	/* Re-fetch actual device set. */
