@@ -1449,7 +1449,17 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	    from = X_DEFAULT;
 	}
     }
-    psav->CommandDMA = (psav->CommandDMA && !S3_SAVAGE3D_SERIES(psav->Chipset));
+    if (psav->CommandDMA && S3_SAVAGE3D_SERIES(psav->Chipset)) {
+	xf86DrvMsg(pScrn->scrnIndex, from == X_CONFIG ? X_WARNING : X_INFO,
+		   "Savage3D/MX/IX does not support command DMA.\n");
+	psav->CommandDMA = FALSE;
+    }
+    if ((psav->CommandDMA || psav->VertexDMA) &&
+	psav->Chipset == S3_SUPERSAVAGE) {
+	xf86DrvMsg(pScrn->scrnIndex, from == X_CONFIG ? X_WARNING : X_INFO,
+		   "DMA is not supported on SuperSavages.\n");
+	psav->CommandDMA = psav->VertexDMA = FALSE;
+    }
     if (psav->CommandDMA && psav->VertexDMA)
 	xf86DrvMsg(pScrn->scrnIndex, from,
 		   "Will try command and vertex DMA mode\n");
