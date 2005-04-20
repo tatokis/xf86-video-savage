@@ -1,4 +1,4 @@
-#include "Xv.h"
+#include <X11/extensions/Xv.h>
 #include "dix.h"
 #include "dixstruct.h"
 
