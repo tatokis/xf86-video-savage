@@ -98,8 +98,12 @@ SavageHWCursorInit(ScreenPtr pScreen)
       )
 	infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
 #endif
-    /* With streams engine the Cursor seems to be ALWAYS TrueColor */
-    infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
+    /*
+     * With streams engine the Cursor seems to be ALWAYS TrueColor 
+     *except at least the Savage4
+     */
+    if (psav->Chipset != S3_SAVAGE4)
+	infoPtr->Flags |= HARDWARE_CURSOR_TRUECOLOR_AT_8BPP; 
 
     infoPtr->SetCursorColors = SavageSetCursorColors;
     infoPtr->SetCursorPosition = SavageSetCursorPosition;

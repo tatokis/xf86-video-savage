@@ -1089,7 +1089,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     xf86CollectOptions(pScrn, NULL);
 
     if (pScrn->depth == 8)
-	pScrn->rgbBits = 8/*6*/;
+	pScrn->rgbBits = 8;
 
     if (!(psav->Options = xalloc(sizeof(SavageOptions))))
 	return FALSE;
@@ -1273,12 +1273,10 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     }
     psav->EntityIndex = pEnt->index;
 
-#ifdef XFree86LOADER    
     if (xf86LoadSubModule(pScrn, "vbe")) {
 	xf86LoaderReqSymLists(vbeSymbols, NULL);
 	psav->pVbe = VBEInit(NULL, pEnt->index);
     }
-#endif
 
     psav->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
     xf86RegisterResources(pEnt->index, NULL, ResNone);
@@ -2362,14 +2360,14 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 	VGAOUT8(vgaCRIndex, 0x67);
 	VGAOUT8(vgaCRReg, restore->CR67);
 
-	/* Enable gamma correction. */
+	/* Enable gamma correction, set CLUT to 8 bit */
 
 	VGAOUT8(0x3c4, 0x1b);
 	if( (pScrn->bitsPerPixel == 32) && !psav->DGAactive 
 	    && ! psav->FBStart2nd )
 		VGAOUT8(0x3c5, 0x18 );
 	else
-		VGAOUT8(0x3c5, 0x00 );
+		VGAOUT8(0x3c5, 0x10 );
 
 	/* We may need TV/panel fixups here.  See s3bios.c line 2904. */
 
@@ -2668,7 +2666,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
     VGAOUT8(0x3c5, restore->SR18);
     VGAOUT8(0x3c4, 0x1b);
     if( psav->DGAactive )
-	VGAOUT8(0x3c5, restore->SR1B & ~0x18);
+	VGAOUT8(0x3c5, restore->SR1B & ~0x08 );
     else
 	VGAOUT8(0x3c5, restore->SR1B);
 
@@ -3445,7 +3443,7 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     TRACE(("SavageModeInit(%dx%d, %dHz)\n", 
 	mode->HDisplay, mode->VDisplay, mode->Clock));
-
+    
 #if 0
     ErrorF("Clock = %d, HDisplay = %d, HSStart = %d\n",
 	    mode->Clock, mode->HDisplay, mode->HSyncStart);
@@ -3498,11 +3496,13 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	    mode->CrtcHDisplay *= 2;
 	    mode->CrtcHSyncStart *= 2;
 	    mode->CrtcHSyncEnd *= 2;
+	    mode->CrtcHBlankStart *= 2;
+	    mode->CrtcHBlankEnd *= 2;
 	    mode->CrtcHTotal *= 2;
 	    mode->CrtcHSkew *= 2;
 	    mode->CrtcHAdjusted = TRUE;
 	}
-
+    
     if (!vgaHWInit(pScrn, mode))
 	return FALSE;
 
@@ -3590,11 +3590,6 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	new->SR15 = 0x03 | 0x80;
 	new->SR18 = 0x00;
 
-/*	VGAOUT8(0x3c4, 0x1b);
-	new->SR1B = VGAIN8(0x3c5);
-	if( pScrn->depth == 24 )
-		new->SR1B |= 0x28;
-*/
 
 	/* enable gamma correction */
 	if( pScrn->depth == 24 )
@@ -3602,7 +3597,9 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	else
 	    new->SR1B = 0x00;
 
-
+	/* set 8-bit CLUT */
+	new->SR1B |= 0x10;
+	
 	new->CR43 = new->CR45 = new->CR65 = 0x00;
 
 	VGAOUT8(vgaCRIndex, 0x40);
@@ -3673,7 +3670,7 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
 	new->CR3B = j & 0xff;
 	i |= (j & 0x100) >> 2;
-	new->CR3C = (vganew->CRTC[0] + ((i & 0x01) << 8)) / 2;
+	new->CR3C = (vganew->CRTC[0] + ((i & 0x01) << 8))  / 2 ;
 	new->CR5D = i;
 	new->CR5E = (((mode->CrtcVTotal - 2) & 0x400) >> 10) |
 		    (((mode->CrtcVDisplay - 1) & 0x400) >> 9) |
@@ -3990,7 +3987,7 @@ void SavageLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
     SavagePtr psav = SAVPTR(pScrn);
     int i, index;
     int updateKey = -1;
-    unsigned char byte;
+    unsigned char byte = 0;
 
     /* choose CLUT */
     if (psav->IsPrimary) {
@@ -4063,7 +4060,6 @@ void SavageLoadPaletteSavage4(ScrnInfoPtr pScrn, int numColors, int *indicies,
     int i, index;
     int updateKey = -1;
     
-    vgaHWPtr hwp = VGAHWPTR(pScrn);
     VerticalRetraceWait();
 
     for (i=0; i<numColors; i++) {
@@ -4330,8 +4326,14 @@ static void SavageDPMS(ScrnInfoPtr pScrn, int mode, int flags)
 static void
 SavageProbeDDC(ScrnInfoPtr pScrn, int index)
 {
-    SavagePtr psav = SAVPTR(pScrn);
-    ConfiguredMonitor = vbeDoEDID(psav->pVbe, NULL);
+    vbeInfoPtr pVbe;
+    
+    if (xf86LoadSubModule(pScrn, "vbe")) {
+	xf86LoaderReqSymLists(vbeSymbols, NULL);
+	pVbe = VBEInit(NULL, index);
+	ConfiguredMonitor = vbeDoEDID(pVbe, NULL);
+	vbeFree(pVbe);
+    }
 }
 
 static unsigned int
