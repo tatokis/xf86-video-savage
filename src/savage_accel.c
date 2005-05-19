@@ -1541,12 +1541,19 @@ SavageInitAccel(ScreenPtr pScreen)
     /* ScreenToScreen copies */
 
 #if 1
+    /* screen to screen copies cause corruption when used on crtc2 @32 bpp
+       not sure why -- AGD */
+    if ((pScrn->bitsPerPixel == 32) && (psav->IsSecondary)) {
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+                   "XAAScreenToScreenCopy disabled on crtc2 at depth 24\n");
+    } else {
     xaaptr->SetupForScreenToScreenCopy = SavageSetupForScreenToScreenCopy;
     xaaptr->SubsequentScreenToScreenCopy = SavageSubsequentScreenToScreenCopy;
     xaaptr->ScreenToScreenCopyFlags = 0
 	| NO_TRANSPARENCY
 	| NO_PLANEMASK
 	| ROP_NEEDS_SOURCE;
+    }
 #endif
 
 
