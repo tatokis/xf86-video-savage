@@ -104,7 +104,7 @@ extern ScrnInfoPtr gpScrn;
 
 int gSavageEntityIndex = -1;
 
-DriverRec SAVAGE =
+_X_EXPORT DriverRec SAVAGE =
 {
     SAVAGE_VERSION,
     SAVAGE_DRIVER_NAME,
@@ -430,7 +430,11 @@ static XF86ModuleVersionInfo SavageVersRec = {
     {0, 0, 0, 0}
 };
 
-XF86ModuleData savageModuleData = { &SavageVersRec, SavageSetup, NULL };
+_X_EXPORT XF86ModuleData savageModuleData = {
+    &SavageVersRec,
+    SavageSetup,
+    NULL
+};
 
 static pointer SavageSetup(pointer module, pointer opts, int *errmaj,
 			   int *errmin)
