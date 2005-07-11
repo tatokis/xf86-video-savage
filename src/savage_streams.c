@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <X11/extensions/Xv.h>
 #include "dix.h"
 #include "dixstruct.h"

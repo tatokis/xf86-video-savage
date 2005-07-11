@@ -9,6 +9,10 @@
  * Ported to 4.0 by Tim Roberts.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "savage_driver.h"
 
 static void SavageLoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src);

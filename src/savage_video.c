@@ -1,5 +1,9 @@
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_video.c,v 1.17tsi Exp $ */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <X11/extensions/Xv.h>
 #include "dix.h"
 #include "dixstruct.h"

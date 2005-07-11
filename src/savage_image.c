@@ -1,5 +1,9 @@
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_image.c,v 1.4 2001/05/18 23:35:32 dawes Exp $ */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "savage_driver.h"
 #include "xaarop.h"
 #include "savage_bci.h"

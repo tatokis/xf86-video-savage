@@ -1,9 +1,13 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_shadow.c,v 1.2 2002/05/14 20:19:52 alanh Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/s3virge/s3v_shadow.c,v 1.3 2000/03/31 20:13:33 dawes Exp $ */
 
 /*
    Copyright (c) 1999,2000  The XFree86 Project Inc. 
    based on code written by Mark Vojkovich <markv@valinux.com>
 */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include "savage_driver.h"
 #include "shadowfb.h"
