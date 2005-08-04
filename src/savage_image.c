@@ -105,13 +105,17 @@ SavageWriteBitmapCPUToScreenColorExpand (
 
     cmd = BCI_CMD_RECT | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
         | BCI_CMD_SEND_COLOR | BCI_CMD_CLIP_LR
-        | BCI_CMD_DEST_GBD | BCI_CMD_SRC_MONO;
+        | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_MONO;
     cmd |= XAAGetCopyROP(rop) << 16;
 
     if( bg == -1 )
         cmd |= BCI_CMD_SRC_TRANSPARENT;
 
     BCI_SEND(cmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     BCI_SEND(BCI_CLIP_LR(x+skipleft, x+w-1));
     BCI_SEND(fg);
     if( bg != -1 )
@@ -162,7 +166,7 @@ SavageSetupForImageWrite(
 
     cmd = BCI_CMD_RECT | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
         | BCI_CMD_CLIP_LR
-        | BCI_CMD_DEST_GBD | BCI_CMD_SRC_COLOR;
+        | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_COLOR;
 
     cmd |= XAAGetCopyROP(rop) << 16;
 
@@ -186,8 +190,12 @@ void SavageSubsequentImageWriteRect
     SavagePtr psav = SAVPTR(pScrn);
     BCI_GET_PTR;
 
-    psav->WaitQueue( psav, 6 );
+    psav->WaitQueue( psav, 8 );
     BCI_SEND(psav->SavedBciCmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     BCI_SEND(BCI_CLIP_LR(x+skipleft, x+w-1));
     if( psav->SavedBgColor != 0xffffffff )
         BCI_SEND(psav->SavedBgColor);

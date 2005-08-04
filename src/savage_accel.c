@@ -981,7 +981,8 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
     OUTREG32(0x8128, 0xFFFFFFFFL);
     OUTREG32(0x812C, 0xFFFFFFFFL);
 
-    OUTREG32(S3_BCI_GLB_BD_HIGH, bci_enable | S3_LITTLE_ENDIAN | S3_BD64);
+    if (!psav->IsSecondary)
+    	OUTREG32(S3_BCI_GLB_BD_HIGH, bci_enable | S3_LITTLE_ENDIAN | S3_BD64);
     
     /* CR50, bit 7,6,0 = 111, Use GBD.*/
     OUTREG8(CRT_ADDRESS_REG,0x50);
@@ -1070,15 +1071,17 @@ void SavageSetGBD_M7(ScrnInfoPtr pScrn)
     byte = (INREG8(CRT_DATA_REG) | 0x04) & 0xFE;
     OUTREG8(CRT_DATA_REG,byte);
 
-    /* program the GBD and SBD's */
-    OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
-    /* 8: bci enable */
-    OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart
+    if (!psav->IsSecondary) {
+    	/* program the GBD and SBD's */
+    	OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
+    	/* 8: bci enable */
+    	OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart
                              | bci_enable | S3_LITTLE_ENDIAN | S3_BD64));
-    OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
-    OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    	OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    	OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    	OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    	OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    }
 
     /* turn on screen */
     OUTREG8(SEQ_ADDRESS_REG,0x01);
@@ -1230,8 +1233,9 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     OUTREG32(0x8128, 0xFFFFFFFFL);
     OUTREG32(0x812C, 0xFFFFFFFFL);
     
-    /* bit 28:block write disable */
-    OUTREG32(S3_GLB_BD_HIGH, bci_enable | S3_BD64 | 0x10000000); 
+    if (!psav->IsSecondary)
+    	/* bit 28:block write disable */
+    	OUTREG32(S3_GLB_BD_HIGH, bci_enable | S3_BD64 | 0x10000000); 
     
     /* CR50, bit 7,6,0 = 111, Use GBD.*/
     OUTREG8(CRT_ADDRESS_REG,0x50);
@@ -1281,14 +1285,16 @@ void SavageSetGBD_PM(ScrnInfoPtr pScrn)
     byte = INREG8(CRT_DATA_REG) & (~(ENABLE_CPUA_BASE_A0000));
     OUTREG8(CRT_DATA_REG,byte);
     
-    /* program the GBD and SBDs */
-    OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
-    OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart 
+    if (!psav->IsSecondary) {
+    	/* program the GBD and SBDs */
+    	OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
+    	OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart 
 			     | bci_enable | S3_LITTLE_ENDIAN | 0x10000000 | S3_BD64));
-    OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
-    OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    	OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    	OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    	OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
+    	OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
+    }
 
     /* turn on screen */
     OUTREG8(SEQ_ADDRESS_REG,0x01);
@@ -1433,46 +1439,6 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     OUTREG8(SEQ_DATA_REG,byte);
 }
 
-static
-void SavageRestoreAccelState(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-    int bci_enable;
-    unsigned long cmd;
-
-    BCI_GET_PTR;
-
-    if (psav->Chipset == S3_SAVAGE_MX)
-    	bci_enable = BCI_ENABLE;
-    else
-	bci_enable = BCI_ENABLE_TWISTER;
-
-    psav->WaitIdleEmpty(psav);
-
-    /* may only need to update the GBD */    
-#if 1
-    psav->WaitQueue(psav, 2);
-
-    cmd = BCI_SET_REGISTER | 0xE0 | (2<<16);
-    BCI_SEND(cmd);
-    BCI_SEND(psav->GlobalBD.bd2.LoPart);
-    BCI_SEND((psav->GlobalBD.bd2.HiPart
-                             | bci_enable | S3_LITTLE_ENDIAN | S3_BD64));
-#endif
-#if 0
-    /* program the GBD */
-    OUTREG32(S3_GLB_BD_LOW,psav->GlobalBD.bd2.LoPart );
-    OUTREG32(S3_GLB_BD_HIGH,(psav->GlobalBD.bd2.HiPart
-                             | bci_enable | S3_LITTLE_ENDIAN | S3_BD64));
-    OUTREG32(S3_PRI_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_PRI_BD_HIGH,psav->GlobalBD.bd2.HiPart);
-    OUTREG32(S3_SEC_BD_LOW,psav->GlobalBD.bd2.LoPart);
-    OUTREG32(S3_SEC_BD_HIGH,psav->GlobalBD.bd2.HiPart);
-#endif
-
-    return;
-}
-
 /* Acceleration init function, sets up pointers to our accelerated functions */
 
 Bool 
@@ -1526,38 +1492,17 @@ SavageInitAccel(ScreenPtr pScreen)
 
     xaaptr->Sync = SavageAccelSync;
 
-    if(xf86IsEntityShared(pScrn->entityList[0]))
-    {
-        DevUnion* pPriv;
-        SavageEntPtr pEnt;
-        pPriv = xf86GetEntityPrivate(pScrn->entityList[0],
-                gSavageEntityIndex);
-        pEnt = pPriv->ptr;
-        
-        /*if there are more than one devices sharing this entity, we
-          have to assign this call back, otherwise the XAA will be
-          disabled */
-        if(pEnt->HasSecondary)
-           xaaptr->RestoreAccelState           = SavageRestoreAccelState;
-    }
-
-
     /* ScreenToScreen copies */
 
 #if 1
-    /* screen to screen copies cause corruption when used on crtc2 @32 bpp
-       not sure why -- AGD */
-    if ((pScrn->bitsPerPixel == 32) && (psav->IsSecondary)) {
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                   "XAAScreenToScreenCopy disabled on crtc2 at depth 24\n");
-    } else {
+
     xaaptr->SetupForScreenToScreenCopy = SavageSetupForScreenToScreenCopy;
     xaaptr->SubsequentScreenToScreenCopy = SavageSubsequentScreenToScreenCopy;
     xaaptr->ScreenToScreenCopyFlags = 0
 	| NO_TRANSPARENCY
 	| NO_PLANEMASK
 	| ROP_NEEDS_SOURCE;
-    }
+
 #endif
 
 
@@ -2125,7 +2070,8 @@ SavageSetupForScreenToScreenCopy(
     SavagePtr psav = SAVPTR(pScrn);
     int cmd;
 
-    cmd = BCI_CMD_RECT | BCI_CMD_DEST_GBD | BCI_CMD_SRC_GBD;
+    cmd = BCI_CMD_RECT | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_SBD_COLOR_NEW;
+
     BCI_CMD_SET_ROP( cmd, XAAGetCopyROP(rop) );
     if (transparency_color != -1)
         cmd |= BCI_CMD_SEND_COLOR | BCI_CMD_SRC_TRANSPARENT;
@@ -2148,9 +2094,11 @@ SavageSubsequentScreenToScreenCopy(
     int h)
 {
     SavagePtr psav = SAVPTR(pScrn);
+
     BCI_GET_PTR;
 
     if (!w || !h) return;
+
     if (!(psav->SavedBciCmd & BCI_CMD_RECT_XP)) {
         w --;
         x1 += w;
@@ -2164,8 +2112,17 @@ SavageSubsequentScreenToScreenCopy(
         h ++;
     }
 
-    psav->WaitQueue(psav,6);
+    psav->WaitQueue(psav,9);
+
+
     BCI_SEND(psav->SavedBciCmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     if (psav->SavedBgColor != 0xffffffff) 
 	BCI_SEND(psav->SavedBgColor);
     BCI_SEND(BCI_X_Y(x1, y1));
@@ -2192,7 +2149,7 @@ SavageSetupForSolidFill(
 
     cmd = BCI_CMD_RECT
         | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
-        | BCI_CMD_DEST_GBD | BCI_CMD_SRC_SOLID;
+        | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_SOLID;
 
     /* Don't send a color if we don't have to. */
 
@@ -2230,9 +2187,13 @@ SavageSubsequentSolidFillRect(
     if( !w || !h )
 	return;
 
-    psav->WaitQueue(psav,5);
+    psav->WaitQueue(psav,7);
 
     BCI_SEND(psav->SavedBciCmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     if( psav->SavedBciCmd & BCI_CMD_SEND_COLOR )
 	BCI_SEND(psav->SavedFgColor);
     BCI_SEND(BCI_X_Y(x, y));
@@ -2279,7 +2240,7 @@ SavageSetupForCPUToScreenColorExpandFill(
 
     cmd = BCI_CMD_RECT | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
 	| BCI_CMD_CLIP_LR
-        | BCI_CMD_DEST_GBD | BCI_CMD_SRC_MONO;
+        | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_MONO;
 
     mix = SavageHelpPatternROP( pScrn, &fg, &bg, planemask, &rop );
 
@@ -2314,9 +2275,13 @@ SavageSubsequentScanlineCPUToScreenColorExpandFill(
     /* XAA will be sending bitmap data next.  */
     /* We should probably wait for empty/idle here. */
 
-    psav->WaitQueue(psav,20);
+    psav->WaitQueue(psav,22);
 
     BCI_SEND(psav->SavedBciCmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     BCI_SEND(BCI_CLIP_LR(x+skipleft, x+w-1));
     w = (w + 31) & ~31;
     if( psav->SavedBciCmd & BCI_CMD_SEND_COLOR )
@@ -2382,7 +2347,7 @@ SavageSetupForMono8x8PatternFill(
     mix = XAAHelpPatternROP( pScrn, &fg, &bg, planemask, &rop );
 
     cmd = BCI_CMD_RECT | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
-        | BCI_CMD_DEST_GBD;
+        | BCI_CMD_DEST_PBD_NEW;
 
     if( mix & ROP_PAT )
 	cmd |= BCI_CMD_SEND_COLOR | BCI_CMD_PAT_MONO;
@@ -2420,8 +2385,12 @@ SavageSubsequentMono8x8PatternFillRect(
     if( !w || !h )
 	return;
 
-    psav->WaitQueue(psav,7);
+    psav->WaitQueue(psav,9);
     BCI_SEND(psav->SavedBciCmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     if( psav->SavedBciCmd & BCI_CMD_SEND_COLOR )
 	BCI_SEND(psav->SavedFgColor);
     if( psav->SavedBgColor != 0xffffffff )
