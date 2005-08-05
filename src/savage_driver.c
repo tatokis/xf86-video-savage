@@ -3278,7 +3278,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     if (psav->directRenderingEnabled) {
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Direct rendering enabled\n");
     } else {
-        xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Direct rendering disabled\n");
+        xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "Direct rendering disabled\n");
     }
 #endif
 
