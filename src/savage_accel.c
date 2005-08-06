@@ -2493,8 +2493,12 @@ SavageSubsequentSolidBresenhamLine(
         x1, y1, length, octant, e1, e2, err, psav->SavedFgColor );
 #endif
 
-    psav->WaitQueue(psav, 5 );
+    psav->WaitQueue(psav, 7 );
     BCI_SEND(cmd);
+
+    BCI_SEND(psav->GlobalBD.bd2.LoPart);
+    BCI_SEND(psav->GlobalBD.bd2.HiPart);
+
     if( cmd & BCI_CMD_SEND_COLOR )
 	BCI_SEND( psav->SavedFgColor );
     BCI_SEND(BCI_LINE_X_Y(x1, y1));
