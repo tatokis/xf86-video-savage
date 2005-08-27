@@ -1439,6 +1439,16 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     OUTREG8(SEQ_DATA_REG,byte);
 }
 
+static
+void SavageRestoreAccelState(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav = SAVPTR(pScrn);
+
+    psav->WaitIdleEmpty(psav);
+
+    return;
+}
+
 /* Acceleration init function, sets up pointers to our accelerated functions */
 
 Bool 
@@ -1491,6 +1501,21 @@ SavageInitAccel(ScreenPtr pScreen)
 	;
 
     xaaptr->Sync = SavageAccelSync;
+
+    if(xf86IsEntityShared(pScrn->entityList[0]))
+    {
+        DevUnion* pPriv;
+        SavageEntPtr pEnt;
+        pPriv = xf86GetEntityPrivate(pScrn->entityList[0],
+                gSavageEntityIndex);
+        pEnt = pPriv->ptr;
+        
+        /*if there are more than one devices sharing this entity, we
+          have to assign this call back, otherwise the XAA will be
+          disabled */
+        if(pEnt->HasSecondary)
+           xaaptr->RestoreAccelState           = SavageRestoreAccelState;
+    }
 
     /* ScreenToScreen copies */
 
