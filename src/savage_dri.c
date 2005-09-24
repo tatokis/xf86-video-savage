@@ -1595,7 +1595,10 @@ SAVAGEDRISubsequentScreenToScreenCopy(
 
 }
 
-
+/*
+ * the FullScreen DRI code is dead, this is just left in place to show how
+ * to set up pageflipping.
+ */
 static Bool
 SAVAGEDRIOpenFullScreen(ScreenPtr pScreen)
 {
