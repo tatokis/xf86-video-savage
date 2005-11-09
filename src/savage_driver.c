@@ -351,7 +351,6 @@ static const char *int10Symbols[] = {
     "xf86Int10FreePages"
 };
 
-#ifdef XFree86LOADER
 static const char *vbeSymbols[] = {
     "VBEInit",
     "vbeDoEDID",
@@ -360,7 +359,6 @@ static const char *vbeSymbols[] = {
 #endif
     NULL
 };
-#endif
 
 static const char *vbeOptSymbols[] = {
     "vbeModeInit",
