@@ -272,8 +272,7 @@ typedef struct _Savage {
     CARD32 volatile *	ShadowVirtual;
 
     Bool		PrimaryVidMapped;
-    int			dacSpeedBpp;
-    int			minClock, maxClock;
+    int			maxClock;
     int			HorizScaleFactor;
     int			MCLK, REFCLK, LCDclk;
     double		refclk_fact;

@@ -1,3 +1,12 @@
+2006-02-08  Luc Verhaegen  <libv@skynet.be>
+
+	* src/savage_dri.c: (SAVAGEDRIScreenInit):
+	* src/savage_driver.c: (SavagePreInit):
+	* src/savage_driver.h:
+	
+	- Remove insane usage of pScrn->clocks. Set maxClock directly.
+	- Fix trivial and harmless warning in DRI code (FrameBufferBase)
+
 2005-12-20  Kevin E. Martin  <kem-at-freedesktop-dot-org>
 
 	* configure.ac:
