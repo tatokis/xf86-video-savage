@@ -24,6 +24,7 @@
 #include "xf86cmap.h"
 #include "vbe.h"
 #include "xaa.h"
+#include "exa.h"
 #include "xf86xv.h"
 
 #include "savage_regs.h"
@@ -345,6 +346,15 @@ typedef struct _Savage {
     int			ShadowPitch;
     void		(*PointerMoved)(int index, int x, int y);
 
+    /* support for EXA */
+    ExaDriverPtr        EXADriverPtr;
+    Bool		useEXA;
+    unsigned long	EXAendfb;
+    unsigned long 	pbd_offset;
+    unsigned long	sbd_offset;
+    unsigned long	pbd_high;
+    unsigned long	sbd_high;
+
     /* Support for XAA acceleration */
     XAAInfoRecPtr	AccelInfoRec;
     xRectangle		Rect;
@@ -533,6 +543,10 @@ void SavageInitialize2DEngine(ScrnInfoPtr);
 void SavageSetGBD(ScrnInfoPtr);
 void SavageAccelSync(ScrnInfoPtr);
 /*int SavageHelpSolidROP(ScrnInfoPtr pScrn, int *fg, int pm, int *rop);*/
+
+/* XAA and EXA */
+Bool SavageXAAInit(ScreenPtr);
+Bool SavageEXAInit(ScreenPtr);
 
 /* In savage_i2c.c. */
 

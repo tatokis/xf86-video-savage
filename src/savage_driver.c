@@ -193,6 +193,7 @@ typedef enum {
      OPTION_PCI_BURST
     ,OPTION_PCI_RETRY
     ,OPTION_NOACCEL
+    ,OPTION_ACCELMETHOD
     ,OPTION_LCD_CENTER
     ,OPTION_LCDCLOCK
     ,OPTION_MCLK
@@ -226,6 +227,7 @@ typedef enum {
 static const OptionInfoRec SavageOptions[] =
 {
     { OPTION_NOACCEL,	"NoAccel",	OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_ACCELMETHOD, "AccelMethod", OPTV_STRING,	{0}, FALSE },
     { OPTION_HWCURSOR,	"HWCursor",	OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_SWCURSOR,	"SWCursor",	OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_SHADOW_FB,	"ShadowFB",	OPTV_BOOLEAN, {0}, FALSE },
@@ -403,6 +405,18 @@ static const char *xaaSymbols[] = {
     NULL
 };
 
+static const char *exaSymbols[] = {
+    "exaDriverAlloc",
+    "exaDriverInit",
+    "exaDriverFini",
+    "exaOffscreenAlloc",
+    "exaOffscreenFree",
+    "exaGetPixmapOffset",
+    "exaGetPixmapPitch",
+    "exaGetPixmapSize",
+    NULL
+};
+
 static const char *shadowSymbols[] = {
     "ShadowFBInit",
     NULL
@@ -446,7 +460,9 @@ static pointer SavageSetup(pointer module, pointer opts, int *errmaj,
 	setupDone = TRUE;
 	xf86AddDriver(&SAVAGE, module, 0);
 	LoaderRefSymLists(vgaHWSymbols, fbSymbols, ramdacSymbols, 
-			  xaaSymbols, shadowSymbols, vbeSymbols, vbeOptSymbols,
+			  xaaSymbols,
+			  exaSymbols,
+			  shadowSymbols, vbeSymbols, vbeOptSymbols,
 #ifdef XF86DRI
                           drmSymbols, driSymbols,
 #endif
@@ -1152,6 +1168,22 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 		   "HW acceleration not supported with \"shadowFB\".\n");
 	psav->NoAccel = TRUE;
+    }
+
+    if(!psav->NoAccel) {
+        from = X_DEFAULT;
+	char *strptr;
+        if((strptr = (char *)xf86GetOptValString(psav->Options, OPTION_ACCELMETHOD))) {
+	    if(!xf86NameCmp(strptr,"XAA")) {
+	        from = X_CONFIG;
+	        psav->useEXA = FALSE;
+	    } else if(!xf86NameCmp(strptr,"EXA")) {
+	       from = X_CONFIG;
+	       psav->useEXA = TRUE;
+	    }
+       }
+       xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
+		psav->useEXA ? "EXA" : "XAA");
     }
 
     if ((s = xf86GetOptValString(psav->Options, OPTION_OVERLAY))) {
@@ -1980,13 +2012,40 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     xf86LoaderReqSymLists(fbSymbols, NULL);
 
     if( !psav->NoAccel ) {
-	if( !xf86LoadSubModule(pScrn, "xaa") ) {
-	    SavageFreeRec(pScrn);
-	    vbeFree(psav->pVbe);
-	    psav->pVbe = NULL;
-	    return FALSE;
+
+        char *modName = NULL;
+        const char **symNames = NULL;
+
+	if (psav->useEXA) {
+	    modName = "exa";
+	    symNames = exaSymbols;
+	    XF86ModReqInfo req;
+	    int errmaj, errmin;
+	    memset(&req, 0, sizeof(req));
+	    req.majorversion = 2;
+	    req.minorversion = 0;
+	    
+	    if( !LoadSubModule(pScrn->module, modName, 
+		NULL, NULL, NULL, &req, &errmaj, &errmin) ) {
+		LoaderErrorMsg(NULL, modName, errmaj, errmin);
+	    	SavageFreeRec(pScrn);
+	    	vbeFree(psav->pVbe);
+	    	psav->pVbe = NULL;
+	    	return FALSE;
+	    }
+	} else {
+	    modName = "xaa";
+	    symNames = xaaSymbols;
+	    if( !xf86LoadSubModule(pScrn, modName) ) {
+	    	SavageFreeRec(pScrn);
+	    	vbeFree(psav->pVbe);
+	    	psav->pVbe = NULL;
+	    	return FALSE;
+	    } 
 	}
-	xf86LoaderReqSymLists(xaaSymbols, NULL );
+
+	xf86LoaderReqSymLists(symNames, NULL );
+
     }
 
     if (psav->hwcursor) {
@@ -2806,7 +2865,7 @@ static Bool SavageMapFB(ScrnInfoPtr pScrn)
 	}
 	if (psav->IsSecondary)
 	    psav->FBStart = psav->FBBase + 0x1000000;
-	else	
+	else
 	    psav->FBStart = psav->FBBase;
     }
 
@@ -3188,7 +3247,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     miInitializeBackingStore(pScreen);
     xf86SetBackingStore(pScreen);
 
-    if( !psav->shadowFB )
+    if( !psav->shadowFB && !psav->useEXA )
 	SavageDGAInit(pScreen);
 
     miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
@@ -3751,6 +3810,11 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
         psav->directRenderingEnabled=FALSE;
     }
 #endif
+
+    if (psav->EXADriverPtr) {
+	exaDriverFini(pScreen);
+	psav->EXADriverPtr = NULL;
+    }
 
     if( psav->AccelInfoRec ) {
         XAADestroyInfoRec( psav->AccelInfoRec );
