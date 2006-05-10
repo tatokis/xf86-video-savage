@@ -45,7 +45,7 @@ SavageDoneCopy(PixmapPtr pDstPixmap);
 Bool
 SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int src_pitch);
 
-#if 0
+#if 1
 Bool
 SavageDownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst, int dst_pitch);
 #endif
@@ -153,8 +153,7 @@ SavageEXAInit(ScreenPtr pScreen)
 		((pScrn->virtualX+31)/32)*((pScrn->virtualY+15)/16) * 2048;
 	}
     } else {
-        psav->EXADriverPtr->offScreenBase = 
-	    ((pScrn->virtualY * psav->lDelta + SAVAGE_BUFFER_ALIGN) & ~SAVAGE_BUFFER_ALIGN);
+        psav->EXADriverPtr->offScreenBase = pScrn->virtualY * psav->lDelta;
     }
 
     if (psav->EXADriverPtr->memorySize > psav->EXADriverPtr->offScreenBase) {
@@ -201,8 +200,8 @@ SavageEXAInit(ScreenPtr pScreen)
     /* host data blit */
     psav->EXADriverPtr->UploadToScreen = SavageUploadToScreen;
 #endif
-#if 0
-    psav->EXADriverPtr->accel.DownloadFromScreen = SavageDownloadFromScreen;
+#if 1
+    psav->EXADriverPtr->DownloadFromScreen = SavageDownloadFromScreen;
 #endif
 
     if(!exaDriverInit(pScreen, psav->EXADriverPtr)) {
@@ -456,17 +455,18 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
     return TRUE;
 }
 
-#if 0
+#if 1
 Bool
 SavageDownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst, int dst_pitch)
 {
     ScrnInfoPtr pScrn = xf86Screens[pSrc->drawable.pScreen->myNum];
-    unsigned char *src;
+    unsigned char *src = pSrc->devPrivate.ptr;
     int	src_pitch = exaGetPixmapPitch(pSrc);
     int	bpp = pSrc->drawable.bitsPerPixel;
 
+    exaWaitSync(pSrc->drawable.pScreen);
+
     /* do the copy */
-    src = pSrc->devPrivate.ptr;
     src += (x * bpp / 8) + (y * src_pitch);
     w *= bpp / 8;
 
