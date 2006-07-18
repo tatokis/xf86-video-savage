@@ -1817,6 +1817,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	psav->videoRambytes = pScrn->videoRam * 1024;
 	psav->CursorKByte = (psav->videoRambytes >> 10) - 4;
 	psav->endfb = (psav->CursorKByte << 10) - 1;
+	psav->videoRambytes *= 2;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
 		"Using %dk of videoram for primary head\n",
 		pScrn->videoRam);
@@ -1825,7 +1826,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if(psav->IsSecondary)
     {  
         pScrn->videoRam /= 2;
-	psav->videoRambytes = pScrn->videoRam * 1024;
+	/*psav->videoRambytes = pScrn->videoRam * 1024;*/
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO, 
 		"Using %dk of videoram for secondary head\n",
 		pScrn->videoRam);
@@ -2907,7 +2908,7 @@ static Bool SavageMapFB(ScrnInfoPtr pScrn)
     else
     	pScrn->fbOffset = 0;
 
-    pScrn->memPhysBase = psav->PciInfo->memBase[0] + pScrn->fbOffset;
+    pScrn->memPhysBase = psav->PciInfo->memBase[0];
 
     return TRUE;
 }
