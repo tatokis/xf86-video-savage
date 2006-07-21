@@ -1634,8 +1634,18 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
             psav->HasCRTC2 = FALSE;
     }
 
-    if ((psav->IsSecondary || psav->IsPrimary) && !psav->UseBIOS)
+    if ((psav->IsSecondary || psav->IsPrimary) && !psav->UseBIOS) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "BIOS currently required for Dualhead mode setting.\n");
+	return FALSE;	
+    }
+
+    if (psav->IsSecondary &&
+	(pScrn->bitsPerPixel > 16) &&
+	!psav->NoAccel &&
+	(psav->Chipset == S3_SAVAGE_MX)) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No acceleration in Dualhead mode at depth 24\n");
+	return FALSE;
+    }
 
     /* maybe throw in some more sanity checks here */
 
