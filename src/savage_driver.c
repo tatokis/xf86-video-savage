@@ -4054,10 +4054,20 @@ void SavageLoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
 
     /* choose CLUT */
     if (psav->IsPrimary) {
+	/* enable CLUT 1 */
+        VGAOUT8(0x3c4, 0x21);
+        byte = VGAIN8(0x3c5);
+        VGAOUT8(0x3c5, (byte & ~0x01));
+	/* select CLUT 1 */
         VGAOUT8(0x3c4, 0x47);
         byte = VGAIN8(0x3c5);
         VGAOUT8(0x3c5, (byte & ~0x03) | 0x01); /* CLUT 1 */
     } else if (psav->IsSecondary) {
+	/* enable CLUT 2 */
+        VGAOUT8(0x3c4, 0x21);
+        byte = VGAIN8(0x3c5);
+        VGAOUT8(0x3c5, (byte & ~0x10));
+	/* select CLUT 2 */
         VGAOUT8(0x3c4, 0x47);
         byte = VGAIN8(0x3c5);
         VGAOUT8(0x3c5, (byte & ~0x03) | 0x02); /* CLUT 2 */
