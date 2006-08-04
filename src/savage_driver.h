@@ -295,7 +295,6 @@ typedef struct _Savage {
     /* These are linear addresses. */
     unsigned char*	MapBase;
     unsigned char*	BciMem;
-    unsigned char*	MapBaseDense;
     unsigned char*	FBBase;
     unsigned char*	ApertureMap;
     unsigned char*	FBStart;

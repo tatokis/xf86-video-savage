@@ -64,8 +64,7 @@ static ModeStatus SavageValidMode(int index, DisplayModePtr mode,
 				  Bool verbose, int flags);
 
 void SavageDGAInit(ScreenPtr);
-static Bool SavageMapMMIO(ScrnInfoPtr pScrn);
-static Bool SavageMapFB(ScrnInfoPtr pScrn);
+static Bool SavageMapMem(ScrnInfoPtr pScrn);
 static void SavageUnmapMem(ScrnInfoPtr pScrn, int All);
 static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
 static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen);
@@ -1650,13 +1649,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     /* maybe throw in some more sanity checks here */
 
-    if (!SavageMapMMIO(pScrn)) {
-	SavageFreeRec(pScrn);
-        vbeFree(psav->pVbe);
-	psav->pVbe = NULL;
-	return FALSE;
-    }
-
     vgaCRIndex = psav->vgaIOBase + 4;
     vgaCRReg = psav->vgaIOBase + 5;
 
@@ -1852,6 +1844,13 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     VGAOUT8(vgaCRIndex, 0x66);
     VGAOUT8(vgaCRReg, cr66 & ~0x02);	/* clear reset flag */
     usleep(10000);
+
+    if (!SavageMapMem(pScrn)) {
+	SavageFreeRec(pScrn);
+        vbeFree(psav->pVbe);
+	psav->pVbe = NULL;
+	return FALSE;
+    }
 
     /* Set status word positions based on chip type. */
     SavageInitStatus(pScrn);
@@ -2811,11 +2810,11 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 }
 
 
-static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
+static Bool SavageMapMem(ScrnInfoPtr pScrn)
 {
     SavagePtr psav;
 
-    TRACE(("SavageMapMMIO()\n"));
+    TRACE(("SavageMapMem()\n"));
 
     psav = SAVPTR(pScrn);
 
@@ -2835,12 +2834,6 @@ static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
     psav->MapBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, psav->PciTag,
 				  psav->MmioBase,
 				  SAVAGE_NEWMMIO_REGSIZE);
-#if 0
-    psav->MapBaseDense = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO_32BIT,
-				       psav->PciTag,
-				       psav->PciInfo->memBase[0],
-				       0x8000);
-#endif
     if (!psav->MapBase) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Internal error: cound not map registers\n");
@@ -2850,16 +2843,6 @@ static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
     psav->BciMem = psav->MapBase + 0x10000;
 
     SavageEnableMMIO(pScrn);
-
-    return TRUE;
-}
-
-
-static Bool SavageMapFB(ScrnInfoPtr pScrn)
-{
-    SavagePtr psav = SAVPTR(pScrn);
-
-    TRACE(("SavageMapFB()\n"));
 
     xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
 	"mapping framebuffer @ 0x%lx with size 0x%x\n", 
@@ -2950,11 +2933,6 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 			psav->videoRambytes);
 	psav->FBBase = 0;
     }
-
-#if 0
-    xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->MapBaseDense,
-		    0x8000);
-#endif
 
     return;
 }
@@ -3080,9 +3058,6 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
  
     SavageEnableMMIO(pScrn);
 
-    if (!SavageMapFB(pScrn))
-	return FALSE;
- 
     psav->FBStart2nd = 0;
 
     if (psav->overlayDepth) {
