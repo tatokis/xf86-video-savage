@@ -115,7 +115,8 @@ _X_EXPORT DriverRec SAVAGE =
     SavageProbe,
     SavageAvailableOptions,
     NULL,
-    0
+    0,
+    NULL
 };
 
 
@@ -458,7 +459,7 @@ static pointer SavageSetup(pointer module, pointer opts, int *errmaj,
 
     if (!setupDone) {
 	setupDone = TRUE;
-	xf86AddDriver(&SAVAGE, module, 0);
+	xf86AddDriver(&SAVAGE, module, 1);
 	LoaderRefSymLists(vgaHWSymbols, fbSymbols, ramdacSymbols, 
 			  xaaSymbols,
 			  exaSymbols,
@@ -2853,7 +2854,6 @@ static Bool SavageMapMMIO(ScrnInfoPtr pScrn)
     return TRUE;
 }
 
-#define TRANSPARENCY_KEY 0xff;
 
 static Bool SavageMapFB(ScrnInfoPtr pScrn)
 {
