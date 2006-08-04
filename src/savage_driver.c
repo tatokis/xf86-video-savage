@@ -1693,10 +1693,10 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     /* Compute the amount of video memory and offscreen memory. */
 
     if (!pScrn->videoRam) {
-	static unsigned char RamSavage3D[] = { 8, 4, 4, 2 };
+	static const unsigned char RamSavage3D[] = { 8, 4, 4, 2 };
 	static unsigned char RamSavage4[] =  { 2, 4, 8, 12, 16, 32, 64, 32 };
-	static unsigned char RamSavageMX[] = { 2, 8, 4, 16, 8, 16, 4, 16 };
-	static unsigned char RamSavageNB[] = { 0, 2, 4, 8, 16, 32, 16, 2 };
+	static const unsigned char RamSavageMX[] = { 2, 8, 4, 16, 8, 16, 4, 16 };
+	static const unsigned char RamSavageNB[] = { 0, 2, 4, 8, 16, 32, 16, 2 };
 
 	switch( psav->Chipset ) {
 	case S3_SAVAGE3D:
