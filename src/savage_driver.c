@@ -2819,13 +2819,47 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
     psav = SAVPTR(pScrn);
 
     if( S3_SAVAGE3D_SERIES(psav->Chipset) ) {
-	psav->MmioBase = psav->PciInfo->memBase[0] + SAVAGE_NEWMMIO_REGBASE_S3;
-	psav->FrameBufferBase = psav->PciInfo->memBase[0];
+	psav->MmioRegion.bar = 0;
+	psav->MmioRegion.offset = SAVAGE_NEWMMIO_REGBASE_S3;
+
+	psav->FbRegion.bar = 0;
+	psav->FbRegion.offset = 0;
+
+	psav->last_bar = 0;
+    } else {
+	psav->MmioRegion.bar = 0;
+	psav->MmioRegion.offset = SAVAGE_NEWMMIO_REGBASE_S4;
+
+	psav->FbRegion.bar = 1;
+	psav->FbRegion.offset = 0;
+
+	psav->last_bar = 1;
     }
-    else {
-	psav->MmioBase = psav->PciInfo->memBase[0] + SAVAGE_NEWMMIO_REGBASE_S4;
-	psav->FrameBufferBase = psav->PciInfo->memBase[1];
+
+    /* On Paramount and Savage 2000, aperture 0 is PCI base 2.  On other
+     * chipsets it's in the same BAR as the framebuffer.
+     */
+    if ((psav->Chipset == S3_SUPERSAVAGE) 
+	|| (psav->Chipset == S3_SAVAGE2000)) {
+	psav->ApertureRegion.bar = 2;
+	psav->ApertureRegion.offset = 0;
+
+	psav->last_bar = 2;
+    } else {
+	psav->ApertureRegion.bar = psav->FbRegion.bar;
+	psav->ApertureRegion.offset = 0x02000000;
     }
+
+
+    psav->MmioBase = psav->PciInfo->memBase[ psav->MmioRegion.bar ]
+      + psav->MmioRegion.offset;
+
+    psav->FrameBufferBase = psav->PciInfo->memBase[ psav->FbRegion.bar ]
+      + psav->FbRegion.offset;
+
+    psav->ApertureBase = psav->PciInfo->memBase[ psav->FbRegion.bar ]
+      + psav->ApertureRegion.offset;
+
 
     xf86DrvMsg( pScrn->scrnIndex, X_INFO,
 	"mapping MMIO @ 0x%lx with size 0x%x\n",
@@ -2863,12 +2897,6 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 	    psav->FBStart = psav->FBBase;
     }
 
-    if ((psav->Chipset == S3_SUPERSAVAGE) || (psav->Chipset == S3_SAVAGE2000))
-        /* paramount, savage2000 aperture 0 is pci base 2 */
-        psav->ApertureBase =  psav->PciInfo->memBase[2];
-    else
-        psav->ApertureBase = psav->FrameBufferBase + 0x02000000;
-
     if (psav->IsSecondary) {
     	psav->ApertureMap = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
                                       psav->PciTag, psav->ApertureBase,
@@ -2889,12 +2917,9 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
                    "Internal error: could not map aperture\n");
         return FALSE;
     }
-    else
-    {
-        xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                   "map aperture:%p\n",psav->ApertureMap);
 
-    }
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "map aperture: %p\n",
+	       psav->ApertureMap);
 
     if (psav->IsSecondary)
 	pScrn->fbOffset = pScrn->videoRam * 1024;

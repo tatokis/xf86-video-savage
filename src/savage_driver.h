@@ -266,6 +266,11 @@ typedef struct _StatInfo {
     int     realOff;
 } StatInfoRec,*StatInfoPtr;
 
+struct savage_region {
+    unsigned        bar;
+    unsigned long   offset;
+};
+
 typedef struct _Savage {
     SavageRegRec	SavedReg;
     SavageRegRec	ModeReg;
@@ -293,6 +298,11 @@ typedef struct _Savage {
     unsigned long	ShadowPhysical;
 
     /* These are linear addresses. */
+    struct savage_region   MmioRegion;
+    struct savage_region   FbRegion;
+    struct savage_region   ApertureRegion;
+    unsigned               last_bar;
+
     unsigned char*	MapBase;
     unsigned char*	BciMem;
     unsigned char*	FBBase;
