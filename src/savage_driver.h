@@ -33,6 +33,8 @@
 #include <string.h>
 #include <math.h>
 
+#include <pciaccess.h>
+
 #define MODE_24 24
 
 #include "compiler.h"
@@ -363,7 +365,7 @@ typedef struct _Savage {
     int			TVSizeY;
 
     CloseScreenProcPtr	CloseScreen;
-    pciVideoPtr		PciInfo;
+    struct pci_device * PciInfo;
     PCITAG		PciTag;
     int			Chipset;
     int			ChipId;

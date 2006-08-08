@@ -95,6 +95,9 @@ if test "$DRI" = yes; then
         AC_DEFINE(XF86DRI_DEVEL,1,[Enable developmental DRI driver support])
 fi
 
+PKG_CHECK_MODULES([PCIACCESS], [pciaccess >= 0.5.0])
+XORG_CFLAGS="$XORG_CFLAGS $PCIACCESS_CFLAGS"
+
 AC_SUBST([DRI_CFLAGS])
 AC_SUBST([XORG_CFLAGS])
 AC_SUBST([moduledir])
