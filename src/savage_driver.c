@@ -2812,11 +2812,11 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 
 static Bool SavageMapMem(ScrnInfoPtr pScrn)
 {
-    SavagePtr psav;
+    SavagePtr psav = SAVPTR(pScrn);
+    int mode;
+    unsigned i;
 
     TRACE(("SavageMapMem()\n"));
-
-    psav = SAVPTR(pScrn);
 
     if( S3_SAVAGE3D_SERIES(psav->Chipset) ) {
 	psav->MmioRegion.bar = 0;
@@ -2861,70 +2861,49 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
       + psav->ApertureRegion.offset;
 
 
-    xf86DrvMsg( pScrn->scrnIndex, X_INFO,
-	"mapping MMIO @ 0x%lx with size 0x%x\n",
-	psav->MmioBase, SAVAGE_NEWMMIO_REGSIZE);
+    /* FIXME: This seems fine even on Savage3D where the same BAR contains the
+     * FIXME: MMIO space and the framebuffer.  Write-combining gets fixed up
+     * FIXME: later.  Someone should investigate this, though.  And kick S3
+     * FIXME: for doing something so silly.
+     */
+    mode = VIDMEM_MMIO;
+    for (i = 0; i <= psav->last_bar; i++) {
+	psav->bar_mappings[i] = xf86MapPciMem(pScrn->scrnIndex, mode,
+					      psav->PciTag,
+					      psav->PciInfo->memBase[i],
+					      (1U << psav->PciInfo->size[i]));
+	if (!psav->bar_mappings[i]) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		       "Internal error: cound not map PCI region %u, last BAR = %u\n",
+		       i, psav->last_bar);
+	    return FALSE;
+	}
 
-    psav->MapBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, psav->PciTag,
-				  psav->MmioBase,
-				  SAVAGE_NEWMMIO_REGSIZE);
-    if (!psav->MapBase) {
-	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		   "Internal error: cound not map registers\n");
-	return FALSE;
+	mode = VIDMEM_FRAMEBUFFER;
     }
+
+    psav->MapBase = psav->bar_mappings[ psav->MmioRegion.bar ]
+      + psav->MmioRegion.offset;
 
     psav->BciMem = psav->MapBase + 0x10000;
 
     SavageEnableMMIO(pScrn);
 
-    xf86DrvMsg( pScrn->scrnIndex, X_PROBED,
-	"mapping framebuffer @ 0x%lx with size 0x%x\n", 
-	psav->FrameBufferBase, psav->videoRambytes);
+    psav->FBBase = psav->bar_mappings[ psav->FbRegion.bar ]
+      + psav->FbRegion.offset;
 
-    if (psav->videoRambytes) {
-	psav->FBBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
-				     psav->PciTag, psav->FrameBufferBase,
-				     psav->videoRambytes);
-	if (!psav->FBBase) {
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		       "Internal error: could not map framebuffer\n");
-	    return FALSE;
-	}
-	if (psav->IsSecondary)
-	    psav->FBStart = psav->FBBase + 0x1000000;
-	else
-	    psav->FBStart = psav->FBBase;
-    }
+    psav->FBStart = (psav->IsSecondary)
+      ? psav->FBBase + 0x1000000 : psav->FBBase;
+
+    psav->ApertureMap = psav->bar_mappings[ psav->ApertureRegion.bar ]
+      + psav->ApertureRegion.offset;
 
     if (psav->IsSecondary) {
-    	psav->ApertureMap = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
-                                      psav->PciTag, psav->ApertureBase,
-                                      0x01000000 * 2);
 	psav->ApertureMap += 0x1000000;
-    } else if (psav->IsPrimary) {
-    	psav->ApertureMap = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
-                                      psav->PciTag, psav->ApertureBase,
-                                      0x01000000 * 2);
-    } else {
-        psav->ApertureMap = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
-                                      psav->PciTag, psav->ApertureBase,
-                                      0x01000000 * 5);
     }
 
-    if (!psav->ApertureMap) {
-        xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                   "Internal error: could not map aperture\n");
-        return FALSE;
-    }
-
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "map aperture: %p\n",
-	       psav->ApertureMap);
-
-    if (psav->IsSecondary)
-	pScrn->fbOffset = pScrn->videoRam * 1024;
-    else
-    	pScrn->fbOffset = 0;
+    pScrn->fbOffset = (psav->IsSecondary)
+      ? pScrn->videoRam * 1024 : 0;
 
     pScrn->memPhysBase = psav->PciInfo->memBase[0];
 
@@ -2934,9 +2913,8 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 
 static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 {
-    SavagePtr psav;
-
-    psav = SAVPTR(pScrn);
+    SavagePtr psav = SAVPTR(pScrn);
+    unsigned i;
 
     TRACE(("SavageUnmapMem(%x,%x)\n", psav->MapBase, psav->FBBase));
 
@@ -2947,17 +2925,22 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 
     SavageDisableMMIO(pScrn);
 
-    if (All && psav->MapBase) {
-	xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->MapBase,
-			SAVAGE_NEWMMIO_REGSIZE);
-	psav->MapBase = 0;
+    for (i = (All) ? 0 : 1; i <= psav->last_bar; i++) {
+	if (psav->bar_mappings[i]) {
+	    xf86UnMapVidMem(pScrn->scrnIndex, psav->bar_mappings[i],
+			    (1U << psav->PciInfo->size[i]));
+	    psav->bar_mappings[i] = NULL;
+	}
     }
 
-    if (psav->FBBase) {
-	xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->FBBase,
-			psav->videoRambytes);
-	psav->FBBase = 0;
+    if (All) {
+	psav->MapBase = 0;
+	psav->BciMem = 0;
     }
+    
+    psav->FBBase = 0;
+    psav->FBStart = 0;
+    psav->ApertureMap = 0;
 
     return;
 }

@@ -303,6 +303,8 @@ typedef struct _Savage {
     struct savage_region   ApertureRegion;
     unsigned               last_bar;
 
+    unsigned char*         bar_mappings[3];
+
     unsigned char*	MapBase;
     unsigned char*	BciMem;
     unsigned char*	FBBase;
