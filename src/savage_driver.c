@@ -816,14 +816,12 @@ static Bool SavageProbe(DriverPtr drv, int flags)
 	foundScreen = TRUE;
     else
 	for (i=0; i<numUsed; i++) {
-            EntityInfoPtr pEnt;
-            ScrnInfoPtr pScrn;
-            pScrn    = NULL;
-	    pEnt = xf86GetEntityInfo(usedChips[i]);
-            if((pScrn = xf86ConfigPciEntity(pScrn, 0, usedChips[i],
-                 SavagePciChipsets, 0, 0, 0, 0, 0)))
-            {
+            EntityInfoPtr pEnt = xf86GetEntityInfo(usedChips[i]);;
+            ScrnInfoPtr pScrn = xf86ConfigPciEntity(NULL, 0, usedChips[i],
+						    NULL, RES_SHARED_VGA, 
+						    NULL, NULL, NULL, NULL);
 
+            if (pScrn != NULL) {
  	        pScrn->driverVersion = SAVAGE_VERSION;
 	        pScrn->driverName = SAVAGE_DRIVER_NAME;
 	        pScrn->name = "SAVAGE";
