@@ -882,12 +882,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    pDRIInfo->ddxDriverMinorVersion = SAVAGE_VERSION_MINOR;
    pDRIInfo->ddxDriverPatchVersion = SAVAGE_PATCHLEVEL;
 
-#if DRIINFO_MAJOR_VERSION < 5
-   pDRIInfo->frameBufferPhysicalAddress = psav->FrameBufferBase;
-#else
    pDRIInfo->frameBufferPhysicalAddress = (pointer) psav->FrameBufferBase;
-#endif
-
    pDRIInfo->frameBufferSize = psav->videoRambytes;
    pDRIInfo->frameBufferStride = pScrn->displayWidth*(pScrn->bitsPerPixel/8);
    pDRIInfo->ddxDrawableTableEntry = SAVAGE_MAX_DRAWABLES;
