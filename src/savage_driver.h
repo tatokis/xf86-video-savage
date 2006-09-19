@@ -444,7 +444,8 @@ typedef struct _Savage {
     __GLXvisualConfig*	pVisualConfigs;
     SAVAGEConfigPrivPtr 	pVisualConfigsPriv;
     SAVAGEDRIServerPrivatePtr DRIServerInfo;
-
+    ScreenWakeupHandlerProcPtr coreWakeupHandler;
+    ScreenBlockHandlerProcPtr  coreBlockHandler;
 
 #if 0
     Bool		haveQuiescense;
