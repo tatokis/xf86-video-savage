@@ -352,7 +352,10 @@ static void SAVAGEWakeupHandler( int screenNum, pointer wakeupData,
 #endif
       psav->ShadowCounter = psav->ShadowVirtual[1023] & 0xffff;
    }
-   psav->AccelInfoRec->NeedToSync = TRUE;
+   if (psav->useEXA)
+	exaMarkSync(pScreen);
+   else
+	psav->AccelInfoRec->NeedToSync = TRUE;
    /* FK: this flag doesn't seem to be used. */
 }
 
@@ -1535,7 +1538,10 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
     }
 
     BCI_SEND(0xc0020000); /* wait for 2D idle */
-    psav->AccelInfoRec->NeedToSync = TRUE;
+    if (psav->useEXA)
+	exaMarkSync(pScreen);
+    else
+	psav->AccelInfoRec->NeedToSync = TRUE;
 }
 
 static void 
