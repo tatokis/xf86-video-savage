@@ -431,13 +431,14 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
 
     /*ErrorF("in UTS\n");*/
 
-    psav->WaitQueue(psav, 5);
+    psav->WaitQueue(psav, 6);
     BCI_SEND(cmd);
 
     /* dst */
     BCI_SEND(psav->sbd_offset);
     BCI_SEND(psav->sbd_high);
 
+    BCI_SEND(BCI_CLIP_LR(x, x+w-1));
     BCI_SEND(BCI_X_Y(x, y));
     BCI_SEND(BCI_W_H(w, h));
     

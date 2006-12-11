@@ -1587,6 +1587,13 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     /* maybe throw in some more sanity checks here */
 
+    if (!SavageMapMem(pScrn)) {
+	SavageFreeRec(pScrn);
+        vbeFree(psav->pVbe);
+	psav->pVbe = NULL;
+	return FALSE;
+    }
+
     vgaCRIndex = psav->vgaIOBase + 4;
     vgaCRReg = psav->vgaIOBase + 5;
 
@@ -1773,6 +1780,9 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 		pScrn->videoRam);
     }
 
+    pScrn->fbOffset = (psav->IsSecondary)
+      ? pScrn->videoRam * 1024 : 0;
+
     /* reset graphics engine to avoid memory corruption */
     VGAOUT8(vgaCRIndex, 0x66);
     cr66 = VGAIN8(vgaCRReg);
@@ -1782,13 +1792,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     VGAOUT8(vgaCRIndex, 0x66);
     VGAOUT8(vgaCRReg, cr66 & ~0x02);	/* clear reset flag */
     usleep(10000);
-
-    if (!SavageMapMem(pScrn)) {
-	SavageFreeRec(pScrn);
-        vbeFree(psav->pVbe);
-	psav->pVbe = NULL;
-	return FALSE;
-    }
 
     /* Set status word positions based on chip type. */
     SavageInitStatus(pScrn);
@@ -2833,9 +2836,6 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
     if (psav->IsSecondary) {
 	psav->ApertureMap += 0x1000000;
     }
-
-    pScrn->fbOffset = (psav->IsSecondary)
-      ? pScrn->videoRam * 1024 : 0;
 
     pScrn->memPhysBase = psav->PciInfo->regions[0].base_addr;
 
