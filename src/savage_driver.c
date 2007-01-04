@@ -3088,6 +3088,9 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
  
     SavageEnableMMIO(pScrn);
 
+    if (!SavageMapMem(pScrn))
+	return FALSE;
+
     psav->FBStart2nd = 0;
 
     if (psav->overlayDepth) {
