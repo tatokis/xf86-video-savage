@@ -4159,9 +4159,6 @@ void SavageLoadPaletteSavage4(ScrnInfoPtr pScrn, int numColors, int *indicies,
 }
 
 static void SavageCalcClock(long freq, int min_m, int min_n1, int max_n1,
-
-	/* Make sure linear addressing is enabled after the BIOS call. */
-	/* Note that we must use an I/O port to do this. */
 			   int min_n2, int max_n2, long freq_min,
 			   long freq_max, unsigned int *mdiv,
 			   unsigned int *ndiv, unsigned int *r)
