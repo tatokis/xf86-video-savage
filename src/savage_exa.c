@@ -197,11 +197,11 @@ SavageEXAInit(ScreenPtr pScreen)
     /* Composite not implemented yet */
     /* savage3d series only have one tmu */
 
-#if 1
+#if 0
     /* host data blit */
     psav->EXADriverPtr->UploadToScreen = SavageUploadToScreen;
 #endif
-#if 1
+#if 0
     psav->EXADriverPtr->DownloadFromScreen = SavageDownloadFromScreen;
 #endif
 
@@ -273,17 +273,22 @@ SavagePrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 {
     ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
-    int cmd;
+    int cmd, rop;
     BCI_GET_PTR;
 
-    /*ErrorF("in preparesolid\n");*/
+    /* HW seems to ignore alpha */
+    if (pPixmap->drawable.bitsPerPixel == 32)
+	return FALSE;
 
     cmd = BCI_CMD_RECT
         | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
-        | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_SOLID
+        | BCI_CMD_DEST_PBD /*BCI_CMD_DEST_PBD_NEW*/
+	| BCI_CMD_SRC_SOLID
 	| BCI_CMD_SEND_COLOR;
-	
-    BCI_CMD_SET_ROP( cmd, SavageGetSolidROP(alu) );
+
+    rop = SavageGetSolidROP(alu);
+
+    BCI_CMD_SET_ROP( cmd, rop );
 
     psav->pbd_offset = exaGetPixmapOffset(pPixmap);
     psav->pbd_high = SavageSetBD(psav, pPixmap);
@@ -291,17 +296,18 @@ SavagePrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     psav->SavedBciCmd = cmd;
     psav->SavedFgColor = fg;
 
-    psav->WaitQueue(psav,6);
+    psav->WaitQueue(psav,5);
 
     BCI_SEND(BCI_SET_REGISTER
 	     | BCI_SET_REGISTER_COUNT(1)
 	     | BCI_BITPLANE_WRITE_MASK);
     BCI_SEND(planemask);
 
-    BCI_SEND(psav->SavedBciCmd);
+    BCI_SEND(BCI_SET_REGISTER
+	     | BCI_SET_REGISTER_COUNT(2)
+	     | BCI_PBD_1);
     BCI_SEND(psav->pbd_offset);
     BCI_SEND(psav->pbd_high);
-    BCI_SEND(psav->SavedFgColor);
 
     return TRUE;
 }
@@ -314,11 +320,13 @@ SavageSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
     int w = x2 - x1;
     int h = y2 - y1;
     BCI_GET_PTR;
-    
-    if( !w || !h )
-	return;
 
-    psav->WaitQueue(psav,2);
+    /* yes, it has to be done this way... */
+    psav->WaitQueue(psav,4);
+    BCI_SEND(psav->SavedBciCmd);
+    /*BCI_SEND(psav->pbd_offset);
+    BCI_SEND(psav->pbd_high);*/
+    BCI_SEND(psav->SavedFgColor);
     BCI_SEND(BCI_X_Y(x1, y1));
     BCI_SEND(BCI_W_H(w, h));
 
