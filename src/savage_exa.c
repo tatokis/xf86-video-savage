@@ -197,7 +197,7 @@ SavageEXAInit(ScreenPtr pScreen)
     /* Composite not implemented yet */
     /* savage3d series only have one tmu */
 
-#if 0
+#if 1
     /* host data blit */
     psav->EXADriverPtr->UploadToScreen = SavageUploadToScreen;
 #endif
@@ -283,10 +283,40 @@ SavagePrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     cmd = BCI_CMD_RECT
         | BCI_CMD_RECT_XP | BCI_CMD_RECT_YP
         | BCI_CMD_DEST_PBD /*BCI_CMD_DEST_PBD_NEW*/
-	| BCI_CMD_SRC_SOLID
-	| BCI_CMD_SEND_COLOR;
+	| BCI_CMD_SRC_SOLID;
 
+#if 0
+    if (alu == 3 /*GXcopy*/) {
+	if (fg == 0)
+	    alu = 0 /*GXclear*/;
+	else if (fg == planemask)
+	    alu = 15 /*GXset*/;
+    }
+
+    if (EXA_PM_IS_SOLID(&pPixmap->drawable, planemask)) {
+	if (!((alu == 5 /*GXnoop*/) || (alu == 15 /*GXset*/) || (alu == 0 /*GXclear*/) || (alu == 10 /*GXinvert*/))) 
+	   cmd |= BCI_CMD_SEND_COLOR;
+	rop = SavageGetCopyROP(alu);
+    } else {	
+	switch(alu) {
+	case 5  /*GXnoop*/:
+	    break;
+	case 15 /*GXset*/:
+	case 0  /*GXclear*/:
+	case 10 /*GXinvert*/:
+	    cmd |= BCI_CMD_SEND_COLOR;
+	    fg = planemask;
+	    break;
+	default:
+	    cmd |= BCI_CMD_SEND_COLOR;
+	    break;
+	}
+	rop = SavageGetSolidROP(alu);
+    }
+#else
+    cmd |= BCI_CMD_SEND_COLOR;
     rop = SavageGetSolidROP(alu);
+#endif
 
     BCI_CMD_SET_ROP( cmd, rop );
 
@@ -326,6 +356,10 @@ SavageSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
     BCI_SEND(psav->SavedBciCmd);
     /*BCI_SEND(psav->pbd_offset);
     BCI_SEND(psav->pbd_high);*/
+#if 0
+    if ( psav->SavedBciCmd & BCI_CMD_SEND_COLOR )
+	BCI_SEND(psav->SavedFgColor);
+#endif
     BCI_SEND(psav->SavedFgColor);
     BCI_SEND(BCI_X_Y(x1, y1));
     BCI_SEND(BCI_W_H(w, h));
@@ -465,7 +499,7 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
 	srcp++;
     }
 
-    exaWaitSync(pDst->drawable.pScreen);
+    /*exaWaitSync(pDst->drawable.pScreen);*/
 
     return TRUE;
 }
