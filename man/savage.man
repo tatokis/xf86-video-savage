@@ -95,13 +95,18 @@ possibly unstable.  The default is
 .BI "Option \*qRotate\*q \*qCW\*q"
 .TP
 .BI "Option \*qRotate\*q \*qCCW\*q"
-Rotate the desktop 90 degrees clockwise or counterclockwise.  This option 
-forces the ShadowFB option on, and disables acceleration.
+Rotate the desktop 90 degrees clockwise or counterclockwise.
+This option forces the ShadowFB option on, and disables acceleration and
+the RandR extension.
 Default: no rotation.
 .TP
 .BI "Option \*qShadowFB\*q \*q" boolean \*q
-Enable or disable use of the shadow framebuffer layer.  This option
-disables acceleration.  Default: off.
+Enable or disable use of the shadow framebuffer layer.
+.\" See
+.\" .BR shadowfb (__drivermansuffix__)
+.\" for further information.
+This option disables acceleration.
+Default: off.
 .TP
 .BI "Option \*qLCDClock\*q \*q" frequency \*q
 Override the maximum dot clock.  Some LCD panels produce incorrect results if

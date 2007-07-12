@@ -1165,15 +1165,23 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if ((s = xf86GetOptValString(psav->Options, OPTION_ROTATE))) {
 	if(!xf86NameCmp(s, "CW")) {
 	    /* accel is disabled below for shadowFB */
+             /* RandR is disabled when the Rotate option is used (does
+              * not work well together and scrambles the screen) */
+
 	    psav->shadowFB = TRUE;
 	    psav->rotate = 1;
+            xf86DisableRandR();
 	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, 
-		       "Rotating screen clockwise - acceleration disabled\n");
+		       "Rotating screen clockwise"
+                       "- acceleration and RandR disabled\n");
 	} else if(!xf86NameCmp(s, "CCW")) {
 	    psav->shadowFB = TRUE;
 	    psav->rotate = -1;
-	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,  "Rotating screen"
-		       "counter clockwise - acceleration disabled\n");
+            xf86DisableRandR();
+            xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Rotating screen counter clockwise"
+                   " - acceleration and RandR disabled\n");
+
 	} else {
 	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "\"%s\" is not a valid"
 		       "value for Option \"Rotate\"\n", s);
