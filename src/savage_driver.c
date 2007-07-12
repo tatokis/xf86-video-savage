@@ -766,9 +766,9 @@ static void SavageFreeRec(ScrnInfoPtr pScrn)
     TRACE(( "SavageFreeRec(%x)\n", pScrn->driverPrivate ));
     if (!pScrn->driverPrivate)
 	return;
+    SavageUnmapMem(pScrn, 1);
     xfree(pScrn->driverPrivate);
     pScrn->driverPrivate = NULL;
-    SavageUnmapMem(pScrn, 1);
 }
 
 
