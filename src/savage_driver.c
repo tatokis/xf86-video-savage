@@ -3911,7 +3911,6 @@ void
 SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    DisplayModePtr currentMode = pScrn->currentMode;    
     int address=0,top=0,left=0,tile_height,tile_size;
     
     TRACE(("SavageDoAdjustFrame(%d,%d,%x)\n", x, y, flags));
@@ -3941,15 +3940,6 @@ SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
     }
     
     address += pScrn->fbOffset;
-
-    /*
-     * because we align the viewport to the width and height of one tile
-     * we should update the locate of frame
-     */
-    pScrn->frameX0 = left;
-    pScrn->frameY0 = top;
-    pScrn->frameX1 = left + currentMode->HDisplay - 1;
-    pScrn->frameY1 = top + currentMode->VDisplay - 1;
 
     if (psav->Chipset == S3_SAVAGE_MX) {
 	if (!crtc2) {
