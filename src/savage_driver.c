@@ -3834,6 +3834,8 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
 #ifdef XF86DRI
     if (psav->directRenderingEnabled) {
         SAVAGEDRICloseScreen(pScreen);
+	/* reset shadow values */
+	SavageInitShadowStatus(pScrn);
         psav->directRenderingEnabled=FALSE;
     }
 #endif
