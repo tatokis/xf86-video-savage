@@ -936,6 +936,63 @@ static void SavageDoDDC(ScrnInfoPtr pScrn)
     }
 }
 
+/* Copied from ddc/Property.c via nv */
+static DisplayModePtr
+SavageModesAdd(DisplayModePtr Modes, DisplayModePtr Additions)
+{
+    if (!Modes) {
+        if (Additions)
+            return Additions;
+        else
+            return NULL;
+    }
+
+    if (Additions) {
+        DisplayModePtr Mode = Modes;
+
+        while (Mode->next)
+            Mode = Mode->next;
+        
+        Mode->next = Additions;
+        Additions->prev = Mode;
+    }
+
+    return Modes;
+}
+
+/* borrowed from nv */
+static void
+SavageAddPanelMode(ScrnInfoPtr pScrn)
+{
+    SavagePtr psav= SAVPTR(pScrn);
+    DisplayModePtr  Mode  = NULL;
+
+    Mode = xf86CVTMode(psav->PanelX, psav->PanelY, 60.00, TRUE, FALSE);
+    Mode->type = M_T_DRIVER | M_T_PREFERRED;
+    pScrn->monitor->Modes = SavageModesAdd(pScrn->monitor->Modes, Mode);
+
+    if ((pScrn->monitor->nHsync == 0) && 
+        (pScrn->monitor->nVrefresh == 0)) {
+	if (!Mode->HSync)
+	    Mode->HSync = ((float) Mode->Clock ) / ((float) Mode->HTotal);
+	if (!Mode->VRefresh)
+	    Mode->VRefresh = (1000.0 * ((float) Mode->Clock)) /
+		((float) (Mode->HTotal * Mode->VTotal));
+
+	if (Mode->HSync < pScrn->monitor->hsync[0].lo)
+	    pScrn->monitor->hsync[0].lo = Mode->HSync;
+	if (Mode->HSync > pScrn->monitor->hsync[0].hi)
+	    pScrn->monitor->hsync[0].hi = Mode->HSync;
+	if (Mode->VRefresh < pScrn->monitor->vrefresh[0].lo)
+	    pScrn->monitor->vrefresh[0].lo = Mode->VRefresh;
+	if (Mode->VRefresh > pScrn->monitor->vrefresh[0].hi)
+	    pScrn->monitor->vrefresh[0].hi = Mode->VRefresh;
+
+	pScrn->monitor->nHsync = 1;
+	pScrn->monitor->nVrefresh = 1;
+    }
+}
+
 static void SavageGetPanelInfo(ScrnInfoPtr pScrn)
 {
     SavagePtr psav= SAVPTR(pScrn);
@@ -1952,6 +2009,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if(psav->DisplayType == MT_LCD)
     {
 	SavageGetPanelInfo(pScrn);
+	SavageAddPanelMode(pScrn);
     }
   
 #if 0
