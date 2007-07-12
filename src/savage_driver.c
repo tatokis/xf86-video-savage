@@ -245,6 +245,7 @@ typedef enum {
     ,OPTION_DMA_MODE
     ,OPTION_AGP_MODE
     ,OPTION_AGP_SIZE
+    ,OPTION_DRI
 } SavageOpts;
 
 
@@ -277,6 +278,7 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_DMA_MODE,  "DmaMode",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_AGP_MODE,	"AGPMode",	OPTV_INTEGER, {0}, FALSE },
     { OPTION_AGP_SIZE,	"AGPSize",	OPTV_INTEGER, {0}, FALSE },
+    { OPTION_DRI,       "DRI",          OPTV_BOOLEAN, {0}, TRUE },
 #endif
     { -1,		NULL,		OPTV_NONE,    {0}, FALSE }
 };
@@ -3120,8 +3122,12 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     vgaHWBlankScreen(pScrn, TRUE);
 
 #ifdef XF86DRI
-    if (psav->IsSecondary) {
-	    psav->directRenderingEnabled = FALSE;
+    if (!xf86ReturnOptValBool(psav->Options, OPTION_DRI, TRUE)) {
+	psav->directRenderingEnabled = FALSE;
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		   "Direct rendering forced off\n");
+    } else if (psav->IsSecondary) {
+	psav->directRenderingEnabled = FALSE;
     } else if (xf86IsEntityShared(psav->pEnt->index)) {
 	    /* Xinerama has sync problem with DRI, disable it for now */
 	    psav->directRenderingEnabled = FALSE;

@@ -221,6 +221,10 @@ on an AGP card the AGP bus speed is not set and no AGP aperture is
 allocated. This implies
 .BI DmaType
 \*qPCI\*q.
+.TP
+.BI "Option \*qDRI\*q \*q" boolean \*q
+Enable DRI support.  This option allows you to enable or disable the DRI.
+Default: \*qon\*q (enable DRI).
 .SH FILES
 savage_drv.o
 .SH "SEE ALSO"
