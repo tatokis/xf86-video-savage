@@ -39,6 +39,8 @@
 #include "config.h"
 #endif
 
+#include <unistd.h>
+
 #include "xf86RAC.h"
 #include "shadowfb.h"
 
