@@ -33,7 +33,18 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef PCIACCESS
 #include <pciaccess.h>
+#define VENDOR_ID(p)      (p)->vendor_id
+#define DEVICE_ID(p)      (p)->device_id
+#define SUBSYS_ID(p)      (p)->subdevice_id
+#define CHIP_REVISION(p)  (p)->revision
+#else
+#define VENDOR_ID(p)      (p)->vendor
+#define DEVICE_ID(p)      (p)->chipType
+#define SUBSYS_ID(p)      (p)->subsysCard
+#define CHIP_REVISION(p)  (p)->chipRev
+#endif
 
 #define MODE_24 24
 
@@ -365,8 +376,12 @@ typedef struct _Savage {
     int			TVSizeY;
 
     CloseScreenProcPtr	CloseScreen;
+#ifdef PCIACCESS
     struct pci_device * PciInfo;
+#else
+    pciVideoPtr		PciInfo;
     PCITAG		PciTag;
+#endif
     int			Chipset;
     int			ChipId;
     int			ChipRev;

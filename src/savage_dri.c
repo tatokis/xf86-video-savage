@@ -467,8 +467,8 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] Mode 0x%08lx [AGP 0x%04x/0x%04x; Card 0x%04x/0x%04x]\n",
 	       mode, vendor, device,
-	       psav->PciInfo->vendor_id,
-	       psav->PciInfo->device_id );
+	       VENDOR_ID(psav->PciInfo),
+	       DEVICE_ID(psav->PciInfo));
 
    if ( drmAgpEnable( psav->drmFD, mode ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not enabled\n" );
@@ -882,7 +882,11 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       sprintf(pDRIInfo->busIdString,
               "PCI:%d:%d:%d",
               psav->PciInfo->bus,
+#ifdef PCIACCESS
               psav->PciInfo->dev,
+#else
+              psav->PciInfo->device,
+#endif
               psav->PciInfo->func);
    }
    pDRIInfo->ddxDriverMajorVersion = SAVAGE_VERSION_MAJOR;
