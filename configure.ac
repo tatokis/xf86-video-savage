@@ -51,11 +51,6 @@ AC_ARG_ENABLE(dri, AC_HELP_STRING([--disable-dri],
                                   [Disable DRI support [[default=auto]]]),
               [DRI="$enableval"],
               [DRI=auto])
-AC_ARG_ENABLE(pciaccess,
-              AS_HELP_STRING([--enable-pciaccess],
-                             [Enable use of libpciaccess (default: disabled)]),
-              [PCIACCESS=$enableval],
-              [PCIACCESS=no])
 
 # Checks for extensions
 XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
@@ -100,12 +95,17 @@ if test "$DRI" = yes; then
         AC_DEFINE(XF86DRI_DEVEL,1,[Enable developmental DRI driver support])
 fi
 
-AM_CONDITIONAL(PCIACCESS, [test "x$PCIACCESS" = xyes])
-if test "x$PCIACCESS" = xyes; then
-    AC_DEFINE(PCIACCESS, 1, [Use libpciaccess])
-    PKG_CHECK_MODULES([PCIACCESS], [pciaccess >= 0.7.0])
-    XORG_CFLAGS="$XORG_CFLAGS $PCIACCESS_CFLAGS"
+save_CFLAGS="$CFLAGS"
+CFLAGS="$XORG_CFLAGS"
+AC_CHECK_DECL(XSERVER_LIBPCIACCESS,
+              [XSERVER_LIBPCIACCESS=yes], [XSERVER_LIBPCIACCESS=no],
+              [#include "xorg-server.h"])
+CFLAGS="$save_CFLAGS"
+
+if test "x$XSERVER_LIBPCIACCESS" = xyes; then
+    PKG_CHECK_MODULES([PCIACCESS], [pciaccess >= 0.10.0])
 fi
+AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
 
 AC_SUBST([DRI_CFLAGS])
 AC_SUBST([XORG_CFLAGS])

@@ -72,7 +72,7 @@ static void SavageDisableMMIO(ScrnInfoPtr pScrn);
 
 static const OptionInfoRec * SavageAvailableOptions(int chipid, int busid);
 static void SavageIdentify(int flags);
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
 static Bool SavagePciProbe(DriverPtr drv, int entity_num,
 			   struct pci_device *dev, intptr_t match_data);
 #else
@@ -138,7 +138,7 @@ extern ScrnInfoPtr gpScrn;
 
 int gSavageEntityIndex = -1;
 
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
 #define SAVAGE_DEVICE_MATCH(d, i) \
     { 0x5333, (d), PCI_MATCH_ANY, PCI_MATCH_ANY, 0, 0, (i) }
 
@@ -212,7 +212,7 @@ static SymTabRec SavageChipsets[] = {
     { -1,		NULL }
 };
 
-#ifndef PCIACCESS
+#ifndef XSERVER_LIBPCIACCESS
 /* This table maps a PCI device ID to a chipset family identifier. */
 
 static PciChipsets SavagePciChipsets[] = {
@@ -318,7 +318,7 @@ _X_EXPORT DriverRec SAVAGE =
     SAVAGE_VERSION,
     SAVAGE_DRIVER_NAME,
     SavageIdentify,
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
     NULL,
 #else
     SavageProbe,
@@ -328,7 +328,7 @@ _X_EXPORT DriverRec SAVAGE =
     0,
     NULL,
 
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
     savage_device_match,
     SavagePciProbe
 #endif
@@ -838,7 +838,7 @@ static void SavageIdentify(int flags)
 }
 
 
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
 static Bool SavagePciProbe(DriverPtr drv, int entity_num,
 			   struct pci_device *dev, intptr_t match_data)
 {
@@ -1592,7 +1592,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     xfree(pEnt);
 
-#ifndef PCIACCESS
+#ifndef XSERVER_LIBPCIACCESS
     psav->PciTag = pciTag(psav->PciInfo->bus, psav->PciInfo->device,
 			  psav->PciInfo->func);
 #endif
@@ -1601,7 +1601,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     /* Set AGP Mode from config */
     /* We support 1X 2X and 4X  */
 #ifdef XF86DRI
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
     /* Try to read the AGP capabilty block from the device.  If there is
      * no AGP info, the device is PCI.
      */
@@ -3060,127 +3060,132 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 static Bool SavageMapMem(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
-#ifndef PCIACCESS
-    int mode;
-#endif
-    unsigned i;
+    int err;
 
     TRACE(("SavageMapMem()\n"));
 
     if( S3_SAVAGE3D_SERIES(psav->Chipset) ) {
-	psav->MmioRegion.bar = 0;
-	psav->MmioRegion.offset = SAVAGE_NEWMMIO_REGBASE_S3;
-
-	psav->FbRegion.bar = 0;
-	psav->FbRegion.offset = 0;
-
-	psav->last_bar = 0;
+#ifdef XSERVER_LIBPCIACCESS
+        psav->MmioRegion.base = SAVAGE_NEWMMIO_REGBASE_S3
+            + psav->PciInfo->regions[0].base_addr;
+        psav->FbRegion.base = psav->PciInfo->regions[0].base_addr;
+#else
+        psav->MmioRegion.base = SAVAGE_NEWMMIO_REGBASE_S3
+            + psav->PciInfo->memBase[0];
+        psav->FbRegion.base = psav->PciInfo->memBase[0];
+#endif
     } else {
-	psav->MmioRegion.bar = 0;
-	psav->MmioRegion.offset = SAVAGE_NEWMMIO_REGBASE_S4;
-
-	psav->FbRegion.bar = 1;
-	psav->FbRegion.offset = 0;
-
-	psav->last_bar = 1;
+#ifdef XSERVER_LIBPCIACCESS
+        psav->MmioRegion.base = SAVAGE_NEWMMIO_REGBASE_S4
+            + psav->PciInfo->regions[0].base_addr;
+        psav->FbRegion.base = psav->PciInfo->regions[1].base_addr;
+#else
+        psav->MmioBase = SAVAGE_NEWMMIO_REGBASE_S4 
+            + psav->PciInfo->memBase[0];
+        psav->FrameBufferBase = psav->PciInfo->memBase[1];
+#endif
     }
+
+    psav->MmioRegion.size = SAVAGE_NEWMMIO_REGSIZE;
+    psav->FbRegion.size = psav->videoRambytes;
 
     /* On Paramount and Savage 2000, aperture 0 is PCI base 2.  On other
      * chipsets it's in the same BAR as the framebuffer.
      */
     if ((psav->Chipset == S3_SUPERSAVAGE) 
-	|| (psav->Chipset == S3_SAVAGE2000)) {
-	psav->ApertureRegion.bar = 2;
-	psav->ApertureRegion.offset = 0;
-
-	psav->last_bar = 2;
+        || (psav->Chipset == S3_SAVAGE2000)) {
+#ifdef XSERVER_LIBPCIACCESS
+        psav->ApertureRegion.base = psav->PciInfo->regions[2].base_addr;
+#else
+        psav->ApertureRegion.base = psav->PciInfo->memBase[2];
+#endif
     } else {
-	psav->ApertureRegion.bar = psav->FbRegion.bar;
-	psav->ApertureRegion.offset = 0x02000000;
+        psav->ApertureRegion.base = psav->FbRegion.base + 0x02000000;
     }
 
+    psav->ApertureRegion.size = (psav->IsPrimary || psav->IsSecondary)
+        ? (0x01000000 * 2) : (0x01000000 * 5);
 
-#ifdef PCIACCESS
-    psav->MmioBase = psav->PciInfo->regions[ psav->MmioRegion.bar ].base_addr
-      + psav->MmioRegion.offset;
 
-    psav->FrameBufferBase = psav->PciInfo->regions[ psav->FbRegion.bar ].base_addr
-      + psav->FbRegion.offset;
-
-    psav->ApertureBase = psav->PciInfo->regions[ psav->FbRegion.bar ].base_addr
-      + psav->ApertureRegion.offset;
+    if (psav->FbRegion.size != 0) {
+#ifdef XSERVER_LIBPCIACCESS
+        err = pci_device_map_range(psav->PciInfo, psav->FbRegion.base,
+                                   psav->FbRegion.size,
+                                   (PCI_DEV_MAP_FLAG_WRITABLE
+                                    | PCI_DEV_MAP_FLAG_WRITE_COMBINE),
+                                   & psav->FbRegion.memory);
 #else
-    psav->MmioBase = psav->PciInfo->memBase[ psav->MmioRegion.bar ]
-      + psav->MmioRegion.offset;
-
-    psav->FrameBufferBase = psav->PciInfo->memBase[ psav->FbRegion.bar ]
-      + psav->FbRegion.offset;
-
-    psav->ApertureBase = psav->PciInfo->memBase[ psav->FbRegion.bar ]
-      + psav->ApertureRegion.offset;
+        psav->FbRegion.memory = 
+            xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
+                          psav->PciTag, psav->FbRegion.base,
+                          psav->FbRegion.size);
+        err = (psav->FbRegion.memory == NULL) ? errno : 0;
 #endif
+        if (err) {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                       "Internal error: cound not map framebuffer range (%d, %s).\n",
+                       err, strerror(err));
+            return FALSE;
+        }
 
-
-    /* FIXME: This seems fine even on Savage3D where the same BAR contains the
-     * FIXME: MMIO space and the framebuffer.  Write-combining gets fixed up
-     * FIXME: later.  Someone should investigate this, though.  And kick S3
-     * FIXME: for doing something so silly.
-     */
-#ifndef PCIACCESS
-    mode = VIDMEM_MMIO;
-#endif
-    for (i = 0; i <= psav->last_bar; i++) {
-	int err;
-	
-#ifdef PCIACCESS
-	err = pci_device_map_region(psav->PciInfo, i, TRUE);
-#else
-	psav->bar_mappings[i] = xf86MapPciMem(pScrn->scrnIndex, mode,
-					      psav->PciTag,
-					      psav->PciInfo->memBase[i],
-					      (1U << psav->PciInfo->size[i]));
-	err = (psav->bar_mappings[i] == NULL);
-#endif
-	if (err) {
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		       "Internal error: cound not map PCI region %u, last BAR = %u\n",
-		       i, psav->last_bar);
-	    return FALSE;
-	}
-
-#ifdef PCIACCESS
-	psav->bar_mappings[i] = psav->PciInfo->regions[i].memory;
-#else
-	mode = VIDMEM_FRAMEBUFFER;
-#endif
+        psav->FBBase = psav->FbRegion.memory;
+        psav->FBStart = (psav->IsSecondary)
+            ? psav->FBBase + 0x1000000 : psav->FBBase;
     }
 
-    psav->MapBase = psav->bar_mappings[ psav->MmioRegion.bar ]
-      + psav->MmioRegion.offset;
+    if (psav->ApertureRegion.memory == NULL) {
+#ifdef XSERVER_LIBPCIACCESS
+        err = pci_device_map_range(psav->PciInfo, psav->ApertureRegion.base,
+                                   psav->ApertureRegion.size,
+                                   (PCI_DEV_MAP_FLAG_WRITABLE
+                                    | PCI_DEV_MAP_FLAG_WRITE_COMBINE),
+                                   & psav->ApertureRegion.memory);
+#else
+        psav->ApertureRegion.memory = 
+            xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
+                          psav->PciTag, psav->ApertureRegion.base,
+                          psav->ApertureRegion.size);
+        err = (psav->ApertureRegion.memory == NULL) ? errno : 0;
+#endif
+        if (err) {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                       "Internal error: cound not map aperture range (%d, %s).\n",
+                       err, strerror(err));
+            return FALSE;
+        }
 
-    psav->BciMem = psav->MapBase + 0x10000;
-
-    SavageEnableMMIO(pScrn);
-
-    psav->FBBase = psav->bar_mappings[ psav->FbRegion.bar ]
-      + psav->FbRegion.offset;
-
-    psav->FBStart = (psav->IsSecondary)
-      ? psav->FBBase + 0x1000000 : psav->FBBase;
-
-    psav->ApertureMap = psav->bar_mappings[ psav->ApertureRegion.bar ]
-      + psav->ApertureRegion.offset;
-
-    if (psav->IsSecondary) {
-	psav->ApertureMap += 0x1000000;
+        psav->ApertureMap = (psav->IsSecondary)
+            ? psav->ApertureRegion.memory
+            : psav->ApertureRegion.memory + 0x1000000;
     }
 
-#ifdef PCIACCESS
-    pScrn->memPhysBase = psav->PciInfo->regions[0].base_addr;
+    if (psav->MmioRegion.memory == NULL) {
+#ifdef XSERVER_LIBPCIACCESS
+        err = pci_device_map_range(psav->PciInfo, psav->MmioRegion.base,
+                                   psav->MmioRegion.size,
+                                   (PCI_DEV_MAP_FLAG_WRITABLE),
+                                   & psav->MmioRegion.memory);
 #else
-    pScrn->memPhysBase = psav->PciInfo->memBase[0];
+        psav->MmioRegion.memory = 
+            xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
+                          psav->PciTag, psav->MmioRegion.base,
+                          psav->MmioRegion.size);
+        err = (psav->MmioRegion.memory == NULL) ? errno : 0;
 #endif
+        if (err) {
+            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+                       "Internal error: cound not map MMIO range (%d, %s).\n",
+                       err, strerror(err));
+            return FALSE;
+        }
 
+        psav->MapBase = psav->MmioRegion.memory;
+        psav->BciMem = psav->MapBase + 0x10000;
+
+        SavageEnableMMIO(pScrn);
+    }
+
+    pScrn->memPhysBase = psav->FbRegion.base;
     return TRUE;
 }
 
@@ -3188,34 +3193,55 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    unsigned i;
 
     TRACE(("SavageUnmapMem(%x,%x)\n", psav->MapBase, psav->FBBase));
 
     if (psav->PrimaryVidMapped) {
-	vgaHWUnmapMem(pScrn);
-	psav->PrimaryVidMapped = FALSE;
+        vgaHWUnmapMem(pScrn);
+        psav->PrimaryVidMapped = FALSE;
     }
 
     SavageDisableMMIO(pScrn);
 
-    for (i = (All) ? 0 : 1; i <= psav->last_bar; i++) {
-	if (psav->bar_mappings[i]) {
-#ifdef PCIACCESS
-	    pci_device_unmap_region(psav->PciInfo, i);
+    if (All && (psav->MmioRegion.memory != NULL)) {
+#ifdef XSERVER_LIBPCIACCESS
+        pci_device_unmap_range(psav->PciInfo,
+                               psav->MmioRegion.memory,
+                               psav->MmioRegion.size);
 #else
-	    xf86UnMapVidMem(pScrn->scrnIndex, psav->bar_mappings[i],
-			    (1U << psav->PciInfo->size[i]));
+        xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->MapBase,
+                        SAVAGE_NEWMMIO_REGSIZE);
 #endif
-	    psav->bar_mappings[i] = NULL;
-	}
+
+        psav->MmioRegion.memory = NULL;
+        psav->MapBase = 0;
+        psav->BciMem = 0;
     }
 
-    if (All) {
-	psav->MapBase = 0;
-	psav->BciMem = 0;
+    if (psav->FbRegion.memory != NULL) {
+#ifdef XSERVER_LIBPCIACCESS
+        pci_device_unmap_range(psav->PciInfo,
+                               psav->FbRegion.memory,
+                               psav->FbRegion.size);
+#else
+        xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->FbRegion.base,
+                        psav->FbRegion.size);
+#else
     }
-    
+
+    if (psav->ApertureRegion.memory != NULL) {
+#ifdef XSERVER_LIBPCIACCESS
+        pci_device_unmap_range(psav->PciInfo,
+                               psav->ApertureRegion.memory,
+                               psav->ApertureRegion.size);
+#else
+        xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->ApertureRegion.base,
+                        psav->ApertureRegion.size);
+#endif
+    }
+
+    psav->FbRegion.memory = NULL;
+    psav->ApertureRegion.memory = NULL;
     psav->FBBase = 0;
     psav->FBStart = 0;
     psav->ApertureMap = 0;
@@ -3304,7 +3330,7 @@ static void SavageInitShadowStatus(ScrnInfoPtr pScrn)
 
     if( psav->ShadowStatus ) {
 	psav->ShadowPhysical = 
-	    psav->FrameBufferBase + psav->CursorKByte*1024 + 4096 - 32;
+	    psav->FbRegion.base + psav->CursorKByte*1024 + 4096 - 32;
 	
 	psav->ShadowVirtual = (CARD32 *)
 	    (psav->FBBase + psav->CursorKByte*1024 + 4096 - 32);

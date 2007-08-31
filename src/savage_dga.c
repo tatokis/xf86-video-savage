@@ -391,7 +391,7 @@ Savage_OpenFramebuffer(
     SavagePtr psav = SAVPTR(pScrn);
 
     *name = NULL;	 /* no special device */
-    *mem = (unsigned char*)psav->FrameBufferBase;
+    *mem = (unsigned char*)psav->FbRegion.base;
     *size = psav->videoRambytes;
     *offset = 0;
     *flags = DGA_NEED_ROOT;

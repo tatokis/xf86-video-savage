@@ -624,7 +624,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    pSAVAGEDRIServer->registers.size = SAVAGEIOMAPSIZE;
 
    if ( drmAddMap( psav->drmFD,
-		   (drm_handle_t)psav->MmioBase,
+		   (drm_handle_t)psav->MmioRegion.base,
 		   pSAVAGEDRIServer->registers.size,
 		   DRM_REGISTERS,0,
 		   &pSAVAGEDRIServer->registers.handle ) < 0 ) {
@@ -636,7 +636,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    pSAVAGEDRIServer->aperture.size = 5 * 0x01000000;
    
    if ( drmAddMap( psav->drmFD,
-		   (drm_handle_t)(psav->ApertureBase),
+		   (drm_handle_t)(psav->ApertureRegion.base),
 		   pSAVAGEDRIServer->aperture.size,
 		   DRM_FRAME_BUFFER,0,
 		   &pSAVAGEDRIServer->aperture.handle ) < 0 ) {
@@ -882,7 +882,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       sprintf(pDRIInfo->busIdString,
               "PCI:%d:%d:%d",
               psav->PciInfo->bus,
-#ifdef PCIACCESS
+#ifdef XSERVER_LIBPCIACCESS
               psav->PciInfo->dev,
 #else
               psav->PciInfo->device,
@@ -893,7 +893,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    pDRIInfo->ddxDriverMinorVersion = SAVAGE_VERSION_MINOR;
    pDRIInfo->ddxDriverPatchVersion = SAVAGE_PATCHLEVEL;
 
-   pDRIInfo->frameBufferPhysicalAddress = (pointer) psav->FrameBufferBase;
+   pDRIInfo->frameBufferPhysicalAddress = (pointer) psav->FbRegion.base;
    pDRIInfo->frameBufferSize = psav->videoRambytes;
    pDRIInfo->frameBufferStride = pScrn->displayWidth*(pScrn->bitsPerPixel/8);
    pDRIInfo->ddxDrawableTableEntry = SAVAGE_MAX_DRAWABLES;
