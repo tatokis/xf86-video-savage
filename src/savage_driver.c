@@ -3226,7 +3226,7 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 #else
         xf86UnMapVidMem(pScrn->scrnIndex, (pointer)psav->FbRegion.base,
                         psav->FbRegion.size);
-#else
+#endif
     }
 
     if (psav->ApertureRegion.memory != NULL) {
