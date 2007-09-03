@@ -467,8 +467,8 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] Mode 0x%08lx [AGP 0x%04x/0x%04x; Card 0x%04x/0x%04x]\n",
 	       mode, vendor, device,
-	       psav->PciInfo->vendor,
-	       psav->PciInfo->chipType );
+	       VENDOR_ID(psav->PciInfo),
+	       DEVICE_ID(psav->PciInfo));
 
    if ( drmAgpEnable( psav->drmFD, mode ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not enabled\n" );
@@ -624,7 +624,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    pSAVAGEDRIServer->registers.size = SAVAGEIOMAPSIZE;
 
    if ( drmAddMap( psav->drmFD,
-		   (drm_handle_t)psav->MmioBase,
+		   (drm_handle_t)psav->MmioRegion.base,
 		   pSAVAGEDRIServer->registers.size,
 		   DRM_REGISTERS,0,
 		   &pSAVAGEDRIServer->registers.handle ) < 0 ) {
@@ -636,7 +636,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    pSAVAGEDRIServer->aperture.size = 5 * 0x01000000;
    
    if ( drmAddMap( psav->drmFD,
-		   (drm_handle_t)(psav->ApertureBase),
+		   (drm_handle_t)(psav->ApertureRegion.base),
 		   pSAVAGEDRIServer->aperture.size,
 		   DRM_FRAME_BUFFER,0,
 		   &pSAVAGEDRIServer->aperture.handle ) < 0 ) {
@@ -882,14 +882,18 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       sprintf(pDRIInfo->busIdString,
               "PCI:%d:%d:%d",
               psav->PciInfo->bus,
+#ifdef XSERVER_LIBPCIACCESS
+              psav->PciInfo->dev,
+#else
               psav->PciInfo->device,
+#endif
               psav->PciInfo->func);
    }
    pDRIInfo->ddxDriverMajorVersion = SAVAGE_VERSION_MAJOR;
    pDRIInfo->ddxDriverMinorVersion = SAVAGE_VERSION_MINOR;
    pDRIInfo->ddxDriverPatchVersion = SAVAGE_PATCHLEVEL;
 
-   pDRIInfo->frameBufferPhysicalAddress = (pointer) psav->FrameBufferBase;
+   pDRIInfo->frameBufferPhysicalAddress = (pointer) psav->FbRegion.base;
    pDRIInfo->frameBufferSize = psav->videoRambytes;
    pDRIInfo->frameBufferStride = pScrn->displayWidth*(pScrn->bitsPerPixel/8);
    pDRIInfo->ddxDrawableTableEntry = SAVAGE_MAX_DRAWABLES;

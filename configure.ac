@@ -95,6 +95,18 @@ if test "$DRI" = yes; then
         AC_DEFINE(XF86DRI_DEVEL,1,[Enable developmental DRI driver support])
 fi
 
+save_CFLAGS="$CFLAGS"
+CFLAGS="$XORG_CFLAGS"
+AC_CHECK_DECL(XSERVER_LIBPCIACCESS,
+              [XSERVER_LIBPCIACCESS=yes], [XSERVER_LIBPCIACCESS=no],
+              [#include "xorg-server.h"])
+CFLAGS="$save_CFLAGS"
+
+if test "x$XSERVER_LIBPCIACCESS" = xyes; then
+    PKG_CHECK_MODULES([PCIACCESS], [pciaccess >= 0.10.0])
+fi
+AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
+
 AC_SUBST([DRI_CFLAGS])
 AC_SUBST([XORG_CFLAGS])
 AC_SUBST([moduledir])
