@@ -40,6 +40,7 @@
 #endif
 
 #include <unistd.h>
+#include <errno.h>
 
 #include "xf86RAC.h"
 #include "shadowfb.h"
@@ -3080,9 +3081,9 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
             + psav->PciInfo->regions[0].base_addr;
         psav->FbRegion.base = psav->PciInfo->regions[1].base_addr;
 #else
-        psav->MmioBase = SAVAGE_NEWMMIO_REGBASE_S4 
+        psav->MmioRegion.base = SAVAGE_NEWMMIO_REGBASE_S4 
             + psav->PciInfo->memBase[0];
-        psav->FrameBufferBase = psav->PciInfo->memBase[1];
+        psav->FbRegion.base = psav->PciInfo->memBase[1];
 #endif
     }
 

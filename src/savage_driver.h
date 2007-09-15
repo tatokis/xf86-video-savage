@@ -280,8 +280,13 @@ typedef struct _StatInfo {
 } StatInfoRec,*StatInfoPtr;
 
 struct savage_region {
+#ifdef XSERVER_LIBPCIACCESS
     pciaddr_t       base;
     pciaddr_t       size;
+#else
+    unsigned long   base;
+    unsigned long   size;
+#endif
     void          * memory;
 };
 
