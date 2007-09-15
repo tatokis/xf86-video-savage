@@ -119,7 +119,7 @@ static Bool SavageDDC1(int scrnIndex);
 static unsigned int SavageDDC1Read(ScrnInfoPtr pScrn);
 static void SavageProbeDDC(ScrnInfoPtr pScrn, int index);
 static void SavageGetTvMaxSize(SavagePtr psav);
-static Bool SavagePanningCheck(ScrnInfoPtr pScrn);
+static Bool SavagePanningCheck(ScrnInfoPtr pScrn, DisplayModePtr pMode);
 #ifdef XF86DRI
 static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn);
 #endif
@@ -3627,7 +3627,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     }
 #endif
 
-    SavagePanningCheck(pScrn);
+    SavagePanningCheck(pScrn, pScrn->currentMode);
 #ifdef XvExtension
     if( !psav->FBStart2nd && !psav->NoAccel  /*&& !SavagePanningCheck(pScrn)*/ ) {
 	if (psav->IsSecondary)
@@ -4271,7 +4271,7 @@ Bool SavageSwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
         pSavEnt = pPriv->ptr;
         SavageModeInit(pSavEnt->pSecondaryScrn, pSavEnt->pSecondaryScrn->currentMode);
     }
-    SavagePanningCheck(pScrn);
+    SavagePanningCheck(pScrn, mode);
 
     return success;
 }
@@ -4750,12 +4750,9 @@ SavageGetTvMaxSize(SavagePtr psav)
 
 
 static Bool
-SavagePanningCheck(ScrnInfoPtr pScrn)
+SavagePanningCheck(ScrnInfoPtr pScrn, DisplayModePtr pMode)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    DisplayModePtr pMode;
-
-    pMode = pScrn->currentMode;
     psav->iResX = pMode->CrtcHDisplay;
     psav->iResY = pMode->CrtcVDisplay;
 
