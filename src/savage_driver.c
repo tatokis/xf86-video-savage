@@ -277,6 +277,7 @@ typedef enum {
     ,OPTION_AGP_MODE
     ,OPTION_AGP_SIZE
     ,OPTION_DRI
+    ,OPTION_IGNORE_EDID
 } SavageOpts;
 
 
@@ -303,6 +304,7 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_DISABLE_COB,  "DisableCOB",  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_BCI_FOR_XV,   "BCIforXv",    OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_DVI,          "DVI",       OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_IGNORE_EDID,  "IgnoreEDID",  OPTV_BOOLEAN, {0}, FALSE },
 #ifdef XF86DRI
     { OPTION_BUS_TYPE,	"BusType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_DMA_TYPE,	"DmaType",	OPTV_ANYSTR,  {0}, FALSE },
@@ -1073,11 +1075,12 @@ static void SavageDoDDC(ScrnInfoPtr pScrn)
                 xf86LoaderReqSymLists(i2cSymbols,NULL);
                 if (SavageI2CInit(pScrn)) {
                     unsigned char tmp;
+                    xf86MonPtr pMon;
                     
                     InI2CREG(tmp,psav->DDCPort);
                     OutI2CREG(tmp | 0x13,psav->DDCPort);
-                    xf86SetDDCproperties(pScrn,xf86PrintEDID(
-                                             xf86DoEDID_DDC2(pScrn->scrnIndex,psav->I2C)));
+                    pMon = xf86PrintEDID(xf86DoEDID_DDC2(pScrn->scrnIndex,psav->I2C));
+                    if (!psav->IgnoreEDID) xf86SetDDCproperties(pScrn, pMon);
                     OutI2CREG(tmp,psav->DDCPort);
                 }
             }
@@ -1347,6 +1350,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     memcpy(psav->Options, SavageOptions, sizeof(SavageOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, psav->Options);
 
+    xf86GetOptValBool(psav->Options, OPTION_IGNORE_EDID, &psav->IgnoreEDID);
     xf86GetOptValBool(psav->Options, OPTION_PCI_BURST, &psav->pci_burst);
 
     if (psav->pci_burst) {
@@ -4728,7 +4732,8 @@ SavageDDC1(int scrnIndex)
     
     xf86PrintEDID(pMon);
     
-    xf86SetDDCproperties(pScrn,pMon);
+    if (!psav->IgnoreEDID)
+        xf86SetDDCproperties(pScrn,pMon);
 
     /* undo initialization */
     OutI2CREG(byte,psav->I2CPort);

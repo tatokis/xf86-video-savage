@@ -335,6 +335,7 @@ typedef struct _Savage {
     /* Here are all the Options */
 
     OptionInfoPtr	Options;
+    Bool		IgnoreEDID;
     Bool		ShowCache;
     Bool		pci_burst;
     Bool		NoPCIRetry;
