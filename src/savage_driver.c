@@ -3156,8 +3156,8 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
         }
 
         psav->ApertureMap = (psav->IsSecondary)
-            ? psav->ApertureRegion.memory
-            : psav->ApertureRegion.memory + 0x1000000;
+            ? psav->ApertureRegion.memory + 0x1000000
+            : psav->ApertureRegion.memory;
     }
 
     if (psav->MmioRegion.memory == NULL) {
