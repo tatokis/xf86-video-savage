@@ -1469,7 +1469,7 @@ SavageDisplayVideoOld(
     if( psav->videoFourCC != id )
       SavageStreamsOff(pScrn);
 
-    if( !psav->videoFlags & VF_STREAMS_ON )
+    if( !(psav->videoFlags & VF_STREAMS_ON) )
       {
         SavageSetBlend(pScrn,id);
 	SavageStreamsOn(pScrn);
@@ -1612,7 +1612,7 @@ SavageDisplayVideoNew(
     if( psav->videoFourCC != id )
       SavageStreamsOff(pScrn);
 
-    if( !psav->videoFlags & VF_STREAMS_ON )
+    if( !(psav->videoFlags & VF_STREAMS_ON) )
       {
 	SavageSetBlend(pScrn,id);
 	SavageStreamsOn(pScrn);
@@ -1746,7 +1746,7 @@ SavageDisplayVideo2000(
     if( psav->videoFourCC != id )
         SavageStreamsOff(pScrn);
                                                                                                                              
-    if( !psav->videoFlags & VF_STREAMS_ON )
+    if( !(psav->videoFlags & VF_STREAMS_ON) )
     {
         SavageSetBlend(pScrn,id);
         SavageStreamsOn(pScrn);
