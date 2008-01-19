@@ -3168,7 +3168,7 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
                                    & psav->MmioRegion.memory);
 #else
         psav->MmioRegion.memory = 
-            xf86MapPciMem(pScrn->scrnIndex, VIDMEM_FRAMEBUFFER,
+            xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO,
                           psav->PciTag, psav->MmioRegion.base,
                           psav->MmioRegion.size);
         err = (psav->MmioRegion.memory == NULL) ? errno : 0;
