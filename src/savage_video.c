@@ -1177,7 +1177,7 @@ SavageCopyPlanarDataBCI(
     SavagePtr psav = SAVPTR(pScrn);
     /* half of the dest buffer for copying the YVU data to it ??? */
     unsigned char *dstCopy = (unsigned char *)(((unsigned long)dst
-                                                + 2 * srcPitch * h
+                                                + dstPitch * h
                                                 + 0x0f) & ~0x0f);
     /* for pixel transfer */
     unsigned long offsetY = (unsigned long)dstCopy - (unsigned long)psav->FBBase;
@@ -1908,6 +1908,10 @@ SavagePutImage(
 	srcPitch = (width << 1);
 	break;
     }  
+
+    if (srcPitch2 != 0 && S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv) {
+        new_size = ((new_size + 0xF) & ~0xF) + srcPitch * height + srcPitch2 * height;
+    }
 
 /*    if(!(pPriv->area = SavageAllocateMemory(pScrn, pPriv->area, new_h)))
 	return BadAlloc;*/
