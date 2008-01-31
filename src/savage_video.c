@@ -1189,21 +1189,15 @@ SavageCopyPlanarDataBCI(
     BCI_GET_PTR;
 
     /* copy Y planar */
-    for (i=0;i<srcPitch * h;i++) {
-        dstCopy[i] = srcY[i];
-    }
+    memcpy(dstCopy, srcY, srcPitch * h);
 
     /* copy V planar */    
     dstCopy = dstCopy + srcPitch * h;
-    for (i=0;i<srcPitch2 * (h>>1);i++) {
-        dstCopy[i] = srcV[i];
-    }
+    memcpy(dstCopy, srcV, srcPitch2 * (h>>1));
 
     /* copy U planar */
     dstCopy = dstCopy + srcPitch2 * (h>>1);    
-    for (i=0;i<srcPitch2 * (h>>1);i++) {
-        dstCopy[i] = srcU[i];        
-    }
+    memcpy(dstCopy, srcU, srcPitch2 * (h>>1));
 
     /*
      * Transfer pixel data from one memory location to another location
@@ -1253,6 +1247,9 @@ SavageCopyData(
   int w
 ){
     w <<= 1;
+    if (w == srcPitch && w == dstPitch) {
+        memcpy(dst, src, w * h);
+    } else
     while(h--) {
 	memcpy(dst, src, w);
 	src += srcPitch;
@@ -1937,7 +1934,7 @@ SavagePutImage(
 	offsetU += tmp;
 	offsetV += tmp;
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
-        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv) {
+        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv && (npixels & 0xF) == 0) {
             SavageCopyPlanarDataBCI(
                 pScrn,
 	    	buf + (top * srcPitch) + (left >> 1), 
