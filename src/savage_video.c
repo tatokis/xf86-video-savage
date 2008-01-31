@@ -1512,8 +1512,10 @@ SavageDisplayVideoOld(
     ssControl |= src_w;
     /*ssControl |= (1 << 24);*/
     ssControl |= (GetBlendForFourCC(psav->videoFourCC) << 24);
+#if 0
     /* Wait for VBLANK. */
     VerticalRetraceWait();
+#endif
     OUTREG(SSTREAM_CONTROL_REG, ssControl);
     if (scalratio)
         OUTREG(SSTREAM_STRETCH_REG,scalratio);
