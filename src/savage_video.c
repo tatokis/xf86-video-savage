@@ -1471,6 +1471,7 @@ SavageDisplayVideoOld(
         SavageSetBlend(pScrn,id);
 	SavageStreamsOn(pScrn);
 	SavageResetVideo(pScrn);
+	pPriv->lastKnownPitch = 0;
       }
 
     if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
@@ -1614,6 +1615,7 @@ SavageDisplayVideoNew(
 	SavageSetBlend(pScrn,id);
 	SavageStreamsOn(pScrn);
 	SavageResetVideo(pScrn);
+	pPriv->lastKnownPitch = 0;
       }
 
     /* Calculate horizontal and vertical scale factors. */
@@ -1748,6 +1750,7 @@ SavageDisplayVideo2000(
         SavageSetBlend(pScrn,id);
         SavageStreamsOn(pScrn);
         SavageResetVideo(pScrn);
+        pPriv->lastKnownPitch = 0;
     }
 
     if (src_w > drw_w)
