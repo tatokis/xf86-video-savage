@@ -1119,14 +1119,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 
    pSAVAGEDRI->apertureHandle	= pSAVAGEDRIServer->aperture.handle;
    pSAVAGEDRI->apertureSize	= pSAVAGEDRIServer->aperture.size;
-   {
-      unsigned int shift = 0;
-      
-      if(pSAVAGEDRI->width > 1024)
-        shift = 1; 
-
-      pSAVAGEDRI->aperturePitch = psav->ulAperturePitch;
-   }
+   pSAVAGEDRI->aperturePitch    = psav->ulAperturePitch;
 
    {
       unsigned int value = 0;
