@@ -1489,23 +1489,32 @@ SavageDisplayVideoOld(
      * Process horizontal scaling
      *  upscaling and downscaling smaller than 2:1 controled by MM8198
      *  MM8190 controls downscaling mode larger than 2:1
+     *  Together MM8190 and MM8198 can set arbitrary downscale up to 64:1
      */
     scalratio = 0;
     ssControl = 0;
 
     if (src_w >= (drw_w * 2)) {
         if (src_w < (drw_w * 4)) {
-            scalratio = HSCALING(2,1);
-        } else if (src_w < (drw_w * 8)) {
             ssControl |= HDSCALE_4;
-        } else if (src_w < (drw_w * 16)) {
+            scalratio = HSCALING(src_w,(drw_w*4));
+        } else if (src_w < (drw_w * 8)) {
             ssControl |= HDSCALE_8;
-        } else if (src_w < (drw_w * 32)) {
+            scalratio = HSCALING(src_w,(drw_w*8));
+        } else if (src_w < (drw_w * 16)) {
             ssControl |= HDSCALE_16;
-        }  else if (src_w < (drw_w * 64)) {
+            scalratio = HSCALING(src_w,(drw_w*16));
+        } else if (src_w < (drw_w * 32)) {
             ssControl |= HDSCALE_32;
-        } else
+            scalratio = HSCALING(src_w,(drw_w*32));
+        } else if (src_w < (drw_w * 64)) {
             ssControl |= HDSCALE_64;
+            scalratio = HSCALING(src_w,(drw_w*64));
+        } else {
+            /* Request beyond maximum downscale! */
+            ssControl |= HDSCALE_64;
+            scalratio = HSCALING(2,1);
+        }
     } else 
         scalratio = HSCALING(src_w,drw_w);
 
