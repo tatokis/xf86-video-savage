@@ -1429,11 +1429,11 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
 
         if (nbox>1) {
 	    /* Keep ordering in each band, reverse order of bands */
-	    pboxNew1 = (BoxPtr)ALLOCATE_LOCAL(sizeof(BoxRec)*nbox);
+	    pboxNew1 = xalloc(sizeof(BoxRec)*nbox);
 	    if (!pboxNew1) return;
-	    pptNew1 = (DDXPointPtr)ALLOCATE_LOCAL(sizeof(DDXPointRec)*nbox);
+	    pptNew1 = xalloc(sizeof(DDXPointRec)*nbox);
 	    if (!pptNew1) {
-	        DEALLOCATE_LOCAL(pboxNew1);
+	        xfree(pboxNew1);
 	        return;
 	    }
 	    pboxBase = pboxNext = pbox+nbox-1;
@@ -1464,14 +1464,14 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
 
         if (nbox > 1) {
 	    /*reverse orderof rects in each band */
-	    pboxNew2 = (BoxPtr)ALLOCATE_LOCAL(sizeof(BoxRec)*nbox);
-	    pptNew2 = (DDXPointPtr)ALLOCATE_LOCAL(sizeof(DDXPointRec)*nbox);
+	    pboxNew2 = xalloc(sizeof(BoxRec)*nbox);
+	    pptNew2 = xalloc(sizeof(DDXPointRec)*nbox);
 	    if (!pboxNew2 || !pptNew2) {
-	        if (pptNew2) DEALLOCATE_LOCAL(pptNew2);
-	        if (pboxNew2) DEALLOCATE_LOCAL(pboxNew2);
+	        if (pptNew2) xfree(pptNew2);
+	        if (pboxNew2) xfree(pboxNew2);
 	        if (pboxNew1) {
-		    DEALLOCATE_LOCAL(pptNew1);
-		    DEALLOCATE_LOCAL(pboxNew1);
+		    xfree(pptNew1);
+		    xfree(pboxNew1);
 		}
 	       return;
 	    }
@@ -1526,12 +1526,12 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
     SAVAGESelectBuffer(pScrn, SAVAGE_FRONT);
 
     if (pboxNew2) {
-        DEALLOCATE_LOCAL(pptNew2);
-        DEALLOCATE_LOCAL(pboxNew2);
+        xfree(pptNew2);
+        xfree(pboxNew2);
     }
     if (pboxNew1) {
-        DEALLOCATE_LOCAL(pptNew1);
-        DEALLOCATE_LOCAL(pboxNew1);
+        xfree(pptNew1);
+        xfree(pboxNew1);
     }
 
     BCI_SEND(0xc0020000); /* wait for 2D idle */
