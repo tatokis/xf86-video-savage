@@ -1,4 +1,3 @@
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/savage/savage_vbe.c,v 1.11 2002/05/14 20:19:52 alanh Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
