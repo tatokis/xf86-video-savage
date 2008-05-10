@@ -3097,10 +3097,16 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
     /* On Paramount and Savage 2000, aperture 0 is PCI base 2.  On other
      * chipsets it's in the same BAR as the framebuffer.
      */
+
+    psav->ApertureRegion.size = (psav->IsPrimary || psav->IsSecondary)
+        ? (0x01000000 * 2) : (0x01000000 * 5);
+
     if ((psav->Chipset == S3_SUPERSAVAGE) 
         || (psav->Chipset == S3_SAVAGE2000)) {
 #ifdef XSERVER_LIBPCIACCESS
         psav->ApertureRegion.base = psav->PciInfo->regions[2].base_addr;
+        if (psav->ApertureRegion.size > psav->PciInfo->regions[2].size)
+            psav->ApertureRegion.size = psav->PciInfo->regions[2].size;
 #else
         psav->ApertureRegion.base = psav->PciInfo->memBase[2];
 #endif
@@ -3108,8 +3114,6 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
         psav->ApertureRegion.base = psav->FbRegion.base + 0x02000000;
     }
 
-    psav->ApertureRegion.size = (psav->IsPrimary || psav->IsSecondary)
-        ? (0x01000000 * 2) : (0x01000000 * 5);
 
 
     if (psav->FbRegion.size != 0) {
