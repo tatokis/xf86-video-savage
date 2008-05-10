@@ -3128,7 +3128,7 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 #endif
         if (err) {
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                       "Internal error: cound not map framebuffer range (%d, %s).\n",
+                       "Internal error: could not map framebuffer range (%d, %s).\n",
                        err, strerror(err));
             return FALSE;
         }
@@ -3154,7 +3154,7 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 #endif
         if (err) {
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                       "Internal error: cound not map aperture range (%d, %s).\n",
+                       "Internal error: could not map aperture range (%d, %s).\n",
                        err, strerror(err));
             return FALSE;
         }
@@ -3179,7 +3179,7 @@ static Bool SavageMapMem(ScrnInfoPtr pScrn)
 #endif
         if (err) {
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                       "Internal error: cound not map MMIO range (%d, %s).\n",
+                       "Internal error: could not map MMIO range (%d, %s).\n",
                        err, strerror(err));
             return FALSE;
         }
