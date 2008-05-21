@@ -18,7 +18,6 @@
 #endif
 #define L_ADD(x)  (B_O32(x) & 0xffff) + ((B_O32(x) >> 12) & 0xffff00)
 
-Bool vbeModeInit( vbeInfoPtr, int );
 static int SavageGetDevice( SavagePtr psav );
 /*static int SavageGetTVType( SavagePtr psav );*/
 void SavageSetVESAModeCrtc1( SavagePtr psav, int n, int Refresh );
@@ -186,15 +185,6 @@ SavageSetVESAMode( SavagePtr psav, int n, int Refresh )
 	    ErrorF("Set video mode failed\n");
 	}
     }
-#ifdef XFree86LOADER
-    else
-    {
-	if( !vbeModeInit( psav->pVbe, n ) )
-	{
-	    ErrorF("Set video mode failed\n");
-	}
-    }
-#endif
 }
 
 void
