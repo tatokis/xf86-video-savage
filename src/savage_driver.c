@@ -1211,6 +1211,30 @@ static void SavageGetPanelInfo(ScrnInfoPtr pScrn)
 	psav->PanelX = panelX;
 	psav->PanelY = panelY;
 
+	do {
+	    DisplayModePtr native = xf86CVTMode(panelX, panelY, 60.0, 0, 0);
+	    if (!native)
+		break;
+
+	    if (!pScrn->monitor->nHsync) {
+		pScrn->monitor->nHsync = 1;
+		pScrn->monitor->hsync[0].lo = 31.5;
+		pScrn->monitor->hsync[0].hi = (float)native->Clock /
+					      (float)native->HTotal;
+	    }
+	    if (!pScrn->monitor->nVrefresh) {
+		pScrn->monitor->nVrefresh = 1;
+		pScrn->monitor->vrefresh[0].lo = 56.0;
+		pScrn->monitor->vrefresh[0].hi = (float)native->Clock * 1000.0 /
+						 (float)native->HTotal /
+						 (float)native->VTotal;
+	    }
+	    if (!pScrn->monitor->maxPixClock)
+		pScrn->monitor->maxPixClock = native->Clock;
+
+	    xfree(native);
+	} while (0);
+
 	if( psav->LCDClock > 0.0 )
 	{
 	    psav->maxClock = psav->LCDClock * 1000.0;
