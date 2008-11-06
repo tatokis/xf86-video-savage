@@ -382,7 +382,7 @@ SavagePrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir
 
     /*ErrorF("in preparecopy\n");*/
 
-    cmd = BCI_CMD_RECT | BCI_CMD_DEST_PBD_NEW | BCI_CMD_SRC_SBD_COLOR_NEW;
+    cmd = BCI_CMD_RECT | BCI_CMD_DEST_PBD | BCI_CMD_SRC_SBD_COLOR;
 
     BCI_CMD_SET_ROP( cmd, SavageGetCopyROP(alu) );
 
@@ -397,18 +397,23 @@ SavagePrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir
 
     psav->SavedBciCmd = cmd;
 
-    psav->WaitQueue(psav,7);
+    psav->WaitQueue(psav,8);
 
     BCI_SEND(BCI_SET_REGISTER
 	     | BCI_SET_REGISTER_COUNT(1)
 	     | BCI_BITPLANE_WRITE_MASK);
     BCI_SEND(planemask);
 
-    BCI_SEND(psav->SavedBciCmd);
     /* src */
+    BCI_SEND(BCI_SET_REGISTER
+	     | BCI_SET_REGISTER_COUNT(2)
+	     | BCI_SBD_1);
     BCI_SEND(psav->sbd_offset);
     BCI_SEND(psav->sbd_high);
     /* dst */
+    BCI_SEND(BCI_SET_REGISTER
+	     | BCI_SET_REGISTER_COUNT(2)
+	     | BCI_PBD_1);
     BCI_SEND(psav->pbd_offset);
     BCI_SEND(psav->pbd_high);
 
@@ -437,7 +442,8 @@ SavageCopy(PixmapPtr pDstPixmap, int srcX, int srcY, int dstX, int dstY, int wid
         height ++;
     }
 
-    psav->WaitQueue(psav,4);
+    psav->WaitQueue(psav,5);
+    BCI_SEND(psav->SavedBciCmd);
     BCI_SEND(BCI_X_Y(srcX, srcY));
     BCI_SEND(BCI_X_Y(dstX, dstY));
     BCI_SEND(BCI_W_H(width, height));
