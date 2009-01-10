@@ -228,7 +228,7 @@ Default: \*qon\*q (enable DRI).
 .SH FILES
 savage_drv.o
 .SH "SEE ALSO"
-__xservername__(__appmansuffix__), __xconfigfile__(__filemansuffix__), xorgconfig(__appmansuffix__), Xserver(__appmansuffix__), X(__miscmansuffix__)
+__xservername__(__appmansuffix__), __xconfigfile__(__filemansuffix__), Xserver(__appmansuffix__), X(__miscmansuffix__)
 .SH AUTHORS
 Authors include Tim Roberts (timr@probo.com) and Ani Joshi (ajoshi@unixbox.com)
 for this version, and Tim Roberts and S. Marineau for the original driver from 
