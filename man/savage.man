@@ -139,6 +139,13 @@ driver use your mode line timing exactly, turn off the UseBios option.
 Use of the BIOS is required for dualhead operation. 
 Default: on (use the BIOS).
 .TP
+.BI "Option \*qIgnoreEDID\*q \*q" boolean \*q
+Do not use EDID data for mode validation, but DDC is still used
+for monitor detection. This is different from NoDDC option.
+.br
+The default value is
+.B off.
+.TP 
 .BI "Option \*qShadowStatus\*q \*q" boolean \*q
 Enables the use of a shadow status register.  There is a chip bug in the 
 Savage graphics engine that can cause a bus lock when reading the engine
