@@ -278,6 +278,7 @@ typedef enum {
     ,OPTION_AGP_SIZE
     ,OPTION_DRI
     ,OPTION_IGNORE_EDID
+    ,OPTION_AGP_FOR_XV
 } SavageOpts;
 
 
@@ -312,6 +313,7 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_AGP_MODE,	"AGPMode",	OPTV_INTEGER, {0}, FALSE },
     { OPTION_AGP_SIZE,	"AGPSize",	OPTV_INTEGER, {0}, FALSE },
     { OPTION_DRI,       "DRI",          OPTV_BOOLEAN, {0}, TRUE },
+    { OPTION_AGP_FOR_XV,   "AGPforXv",    OPTV_BOOLEAN, {0}, FALSE },
 #endif
     { -1,		NULL,		OPTV_NONE,    {0}, FALSE }
 };
@@ -1869,6 +1871,20 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
         xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
                    "%s DVI port support (Savage4 only)\n",(psav->dvi?"Force":"Disable"));
     }
+
+    psav->AGPforXv = FALSE;
+#ifdef XF86DRI
+    if (xf86GetOptValBool(psav->Options, OPTION_AGP_FOR_XV, &psav->AGPforXv)) {
+        if (psav->AGPforXv) {
+            if (psav->agpSize == 0) {
+                psav->AGPforXv = FALSE;
+                xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "AGP not available, cannot use AGP for Xv\n");
+            }
+        }
+        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+                   "Option: %s use of AGP buffer for Xv\n",(psav->AGPforXv?"Enable":"Disable"));
+    }
+#endif
 
     /* Add more options here. */
 
@@ -3677,6 +3693,11 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
             xf86DrvMsg(pScrn->scrnIndex,X_CONFIG,"XvMC is enabled\n");
         else
             xf86DrvMsg(pScrn->scrnIndex,X_CONFIG,"XvMC is not enabled\n");
+    }
+
+    if (!psav->directRenderingEnabled && psav->AGPforXv) {
+        xf86DrvMsg(pScrn->scrnIndex,X_ERROR,"AGPforXV requires DRI to be enabled.\n");
+	psav->AGPforXv = FALSE;
     }
 #endif
 

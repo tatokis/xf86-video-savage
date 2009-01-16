@@ -244,8 +244,13 @@ typedef struct {
    void         *video_memory;			/* opaque memory management information structure */
    CARD32       video_offset;			/* offset in video memory of packed YUV buffer */
 
-   void         *video_planarmem;			/* opaque memory management information structure */
+   void         *video_planarmem;		/* opaque memory management information structure */
    CARD32       video_planarbuf; 		/* offset in video memory of planar YV12 buffer */
+   
+   Bool         tried_agp;			/* TRUE if AGP allocation has been tried */
+   CARD32	agpBase;			/* Physical address of aperture base */
+   CARD32	agpBufferOffset;		/* Offset of buffer in AGP memory, or 0 if unavailable */
+   drmAddress   agpBufferMap;			/* Mapping of AGP buffer in process memory, or NULL */
 
 } SavagePortPrivRec, *SavagePortPrivPtr;
 
@@ -1030,7 +1035,8 @@ static void
 SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 {
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
-    /*SavagePtr psav = SAVPTR(pScrn); */
+    SavagePtr psav = SAVPTR(pScrn);
+    ScreenPtr pScreen = screenInfo.screens[pScrn->scrnIndex];
 
     xf86ErrorFVerb(XVTRACE,"SavageStopVideo\n");
 
@@ -1039,6 +1045,15 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
     if(shutdown) {
       /*SavageClipVWindow(pScrn);*/
  	SavageStreamsOff( pScrn );
+
+	if (pPriv->agpBufferMap != NULL) {
+	    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
+	    drmUnmap(pPriv->agpBufferMap, pSAVAGEDRIServer->agpXVideo.size);
+	    pSAVAGEDRIServer->agpXVideo.map = NULL;
+	    pPriv->agpBufferMap = NULL;
+	    pPriv->agpBufferOffset = 0;
+	}
+
         if (pPriv->video_memory != NULL) {
 	    SavageFreeMemory(pScrn, pPriv->video_memory);
 	    pPriv->video_memory = NULL;
@@ -1048,6 +1063,7 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 	    pPriv->video_planarmem = NULL;
         }
 	pPriv->videoStatus = 0;
+	pPriv->tried_agp = FALSE;
     } else {
 	if(pPriv->videoStatus & CLIENT_VIDEO_ON) {
 	    pPriv->videoStatus |= OFF_TIMER;
@@ -1176,10 +1192,12 @@ SavageCopyPlanarDataBCI(
     unsigned char *srcV, /* V */
     unsigned char *srcU, /* U */
     unsigned char *dst,
+    unsigned char * planarPtr,
     unsigned long planarOffset,
     int srcPitch, int srcPitch2,
     int dstPitch,
-    int h,int w)
+    int h,int w,
+    Bool isAGP)
 {
     SavagePtr psav = SAVPTR(pScrn);
 
@@ -1187,22 +1205,24 @@ SavageCopyPlanarDataBCI(
     unsigned long offsetY = planarOffset;
     unsigned long offsetV = offsetY +  srcPitch * h;
     unsigned long offsetU = offsetV +  srcPitch2 * (h>>1);
-    unsigned char *dstCopy = (unsigned char *)psav->FBBase + planarOffset;
     unsigned long dstOffset  = (unsigned long)dst - (unsigned long)psav->FBBase;
     int i;
+    unsigned char memType;
     
     BCI_GET_PTR;
 
     /* copy Y planar */
-    memcpy(dstCopy, srcY, srcPitch * h);
+    memcpy(planarPtr, srcY, srcPitch * h);
 
     /* copy V planar */    
-    dstCopy = dstCopy + srcPitch * h;
-    memcpy(dstCopy, srcV, srcPitch2 * (h>>1));
+    planarPtr = planarPtr + srcPitch * h;
+    memcpy(planarPtr, srcV, srcPitch2 * (h>>1));
 
     /* copy U planar */
-    dstCopy = dstCopy + srcPitch2 * (h>>1);    
-    memcpy(dstCopy, srcU, srcPitch2 * (h>>1));
+    planarPtr = planarPtr + srcPitch2 * (h>>1);    
+    memcpy(planarPtr, srcU, srcPitch2 * (h>>1));
+
+    memType = isAGP ? 3 : 0;
 
     /*
      * Transfer pixel data from one memory location to another location
@@ -1222,23 +1242,18 @@ SavageCopyPlanarDataBCI(
 
     w = (w+0xf)&0xff0;
     psav->WaitQueue(psav,11);
-    BCI_SEND(0x96070051);
-    BCI_SEND(offsetY);
-
+    BCI_SEND(BCI_SET_REGISTER | BCI_SET_REGISTER_COUNT(7) | 0x51);
+    BCI_SEND(offsetY | memType);
     BCI_SEND(dstOffset);
-
     BCI_SEND(((h-1)<<16)|((w-1)>>3));
-
     BCI_SEND(dstPitch >> 3);
-
-
-    BCI_SEND(offsetU);
-    BCI_SEND(offsetV);
-
+    BCI_SEND(offsetU | memType);
+    BCI_SEND(offsetV | memType);
     BCI_SEND((srcPitch2 << 16)| srcPitch2);
 
-    BCI_SEND(0x96010050);
+    BCI_SEND(BCI_SET_REGISTER | BCI_SET_REGISTER_COUNT(1) | 0x50);
     BCI_SEND(0x00200003 | srcPitch);
+
     BCI_SEND(0xC0170000);
 }
 
@@ -1948,6 +1963,45 @@ SavagePutImage(
         planarFrameSize = srcPitch * height + srcPitch2 * height;
     }
 
+    /* Check whether AGP buffers can be allocated. If not, fall back to ordinary
+       upload to framebuffer (slower) */
+    if (!pPriv->tried_agp && !psav->IsPCI && psav->drmFD > 0) {
+        int ret;
+	SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
+        
+	pPriv->tried_agp = TRUE;
+	if (pSAVAGEDRIServer->agpXVideo.size >= max(new_size, planarFrameSize)) {
+	    if ( drmMap( psav->drmFD,
+		pSAVAGEDRIServer->agpXVideo.handle,
+		pSAVAGEDRIServer->agpXVideo.size,
+		&pSAVAGEDRIServer->agpXVideo.map ) < 0 ) {
+
+		xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] XVideo: Could not map agpXVideo \n" );
+		pPriv->agpBufferOffset = 0;
+		pPriv->agpBufferMap = NULL;
+	    } else {
+		pPriv->agpBufferMap = pSAVAGEDRIServer->agpXVideo.map;
+		pPriv->agpBufferOffset = pSAVAGEDRIServer->agpXVideo.offset;
+		pPriv->agpBase = drmAgpBase(psav->drmFD);
+#if 0
+		xf86DrvMsg( pScreen->myNum, X_INFO,
+		       "[agp] agpXVideo mapped at 0x%08lx aperture=0x%08x offset=0x%08lx\n",
+		       (unsigned long)pPriv->agpBufferMap, pPriv->agpBase, pPriv->agpBufferOffset);
+#endif
+	    }
+	} else {
+	    /* This situation is expected if AGPforXv is disabled, otherwise report. */
+	    if (pSAVAGEDRIServer->agpXVideo.size > 0) {
+		xf86DrvMsg( pScreen->myNum, X_ERROR,
+		    "[agp] XVideo: not enough space in buffer (got %ld bytes, required %ld bytes).\n", 
+	    	    pSAVAGEDRIServer->agpXVideo.size, max(new_size, planarFrameSize));
+	    }
+	    pPriv->agpBufferMap = NULL;
+	    pPriv->agpBufferOffset = 0;
+	}
+    }
+
+
     /* Buffer for final packed frame */
     pPriv->video_offset = SavageAllocateMemory(
 	pScrn, &pPriv->video_memory,
@@ -1991,14 +2045,29 @@ SavagePutImage(
 	offsetV += tmp;
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
         if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv && (npixels & 0xF) == 0 && pPriv->video_planarbuf != 0) {
-            SavageCopyPlanarDataBCI(
-                pScrn,
-	    	buf + (top * srcPitch) + (left >> 1), 
-	    	buf + offsetV, 
-	    	buf + offsetU, 
-	    	dst_start,
-	    	pPriv->video_planarbuf,
-	    	srcPitch, srcPitch2, dstPitch, nlines, npixels);
+            if (pPriv->agpBufferMap != NULL) {
+		/* Using copy to AGP memory */
+		SavageCopyPlanarDataBCI(
+		    pScrn,
+		    buf + (top * srcPitch) + (left >> 1), 
+		    buf + offsetV, 
+		    buf + offsetU, 
+		    dst_start,
+		    pPriv->agpBufferMap,
+		    pPriv->agpBase + pPriv->agpBufferOffset,
+		    srcPitch, srcPitch2, dstPitch, nlines, npixels, TRUE);
+            } else {            
+		/* Using ordinary copy to framebuffer */
+		SavageCopyPlanarDataBCI(
+		    pScrn,
+		    buf + (top * srcPitch) + (left >> 1), 
+		    buf + offsetV, 
+		    buf + offsetU, 
+		    dst_start,
+		    (unsigned char *)psav->FBBase + pPriv->video_planarbuf,
+		    pPriv->video_planarbuf,
+		    srcPitch, srcPitch2, dstPitch, nlines, npixels, FALSE);
+	    }
         } else {
 	    SavageCopyPlanarData(
 	    	buf + (top * srcPitch) + (left >> 1), 
