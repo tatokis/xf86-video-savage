@@ -495,13 +495,21 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
     dwords = (((w * Bpp) + 3) >> 2);
     for (i = 0; i < h; i++) {
 	srcp = (CARD32 *)src;
-	for (j = 0; j < dwords; j++) {
-	    if (queue < 4) {
-		BCI_RESET;
-		queue = 120 * 1024;
+
+	if (4 * dwords <= queue) {
+	    /* WARNING: breaking BCI_PTR abstraction here */
+	    memcpy(bci_ptr, srcp, 4 * dwords);
+	    bci_ptr += dwords;
+	    queue -= 4 * dwords;
+	} else {
+	    for (j = 0; j < dwords; j++) {
+		if (queue < 4) {
+		    BCI_RESET;
+		    queue = 120 * 1024;
+		}
+		BCI_SEND(*srcp++);
+		queue -= 4;
 	    }
-	    BCI_SEND(*srcp++);
-	    queue -= 4;
 	}
 	src += src_pitch;
     }
