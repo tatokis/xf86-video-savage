@@ -241,9 +241,11 @@ typedef struct {
    Time		freeTime;
    int		lastKnownPitch;
 
-   int          size;
-   void         *video_memory;
-   int          video_offset;
+   void         *video_memory;			/* opaque memory management information structure */
+   CARD32       video_offset;			/* offset in video memory of packed YUV buffer */
+
+   void         *video_planarmem;			/* opaque memory management information structure */
+   CARD32       video_planarbuf; 		/* offset in video memory of planar YV12 buffer */
 
 } SavagePortPrivRec, *SavagePortPrivPtr;
 
@@ -1041,6 +1043,10 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 	    SavageFreeMemory(pScrn, pPriv->video_memory);
 	    pPriv->video_memory = NULL;
         }
+        if (pPriv->video_planarmem != NULL) {
+	    SavageFreeMemory(pScrn, pPriv->video_planarmem);
+	    pPriv->video_planarmem = NULL;
+        }
 	pPriv->videoStatus = 0;
     } else {
 	if(pPriv->videoStatus & CLIENT_VIDEO_ON) {
@@ -1170,19 +1176,18 @@ SavageCopyPlanarDataBCI(
     unsigned char *srcV, /* V */
     unsigned char *srcU, /* U */
     unsigned char *dst,
+    unsigned long planarOffset,
     int srcPitch, int srcPitch2,
     int dstPitch,
     int h,int w)
 {
     SavagePtr psav = SAVPTR(pScrn);
-    /* half of the dest buffer for copying the YVU data to it ??? */
-    unsigned char *dstCopy = (unsigned char *)(((unsigned long)dst
-                                                + dstPitch * h
-                                                + 0x0f) & ~0x0f);
+
     /* for pixel transfer */
-    unsigned long offsetY = (unsigned long)dstCopy - (unsigned long)psav->FBBase;
+    unsigned long offsetY = planarOffset;
     unsigned long offsetV = offsetY +  srcPitch * h;
     unsigned long offsetU = offsetV +  srcPitch2 * (h>>1);
+    unsigned char *dstCopy = (unsigned char *)psav->FBBase + planarOffset;
     unsigned long dstOffset  = (unsigned long)dst - (unsigned long)psav->FBBase;
     int i;
     
@@ -1304,6 +1309,8 @@ SavageVideoSave(ScreenPtr pScreen, ExaOffscreenArea *area)
 
     if (pPriv->video_memory == area)
         pPriv->video_memory = NULL;
+    if (pPriv->video_planarmem == area)
+        pPriv->video_planarmem = NULL;
 }
 
 static CARD32
@@ -1870,6 +1877,7 @@ SavagePutImage(
     unsigned char *dst_start;
     int pitch, new_size, offset, offsetV=0, offsetU=0;
     int srcPitch, srcPitch2=0, dstPitch;
+    int planarFrameSize;
     int top, left, npixels, nlines;
     BoxRec dstBox;
     CARD32 tmp;
@@ -1905,8 +1913,8 @@ SavagePutImage(
 
     pitch = pScrn->bitsPerPixel * pScrn->displayWidth >> 3;
 
+    /* All formats directly displayable by Savage are packed and 2 bytes per pixel */
     dstPitch = ((width << 1) + 15) & ~15;
-    /*new_h = ((dstPitch * height) + pitch - 1) / pitch;*/
     new_size = dstPitch * height;
 
     switch(id) {
@@ -1933,16 +1941,37 @@ SavagePutImage(
 	break;
     }  
 
+    /* Calculate required memory for all planar frames */
+    planarFrameSize = 0;
     if (srcPitch2 != 0 && S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv) {
-        new_size = ((new_size + 0xF) & ~0xF) + srcPitch * height + srcPitch2 * height;
+        new_size = ((new_size + 0xF) & ~0xF);
+        planarFrameSize = srcPitch * height + srcPitch2 * height;
     }
 
-/*    if(!(pPriv->area = SavageAllocateMemory(pScrn, pPriv->area, new_h)))
-	return BadAlloc;*/
-    pPriv->video_offset = SavageAllocateMemory(pScrn, &pPriv->video_memory,
-					      new_size);
+    /* Buffer for final packed frame */
+    pPriv->video_offset = SavageAllocateMemory(
+	pScrn, &pPriv->video_memory,
+	new_size);
     if (pPriv->video_offset == 0)
         return BadAlloc;
+
+    /* Packed format cases */
+    if (planarFrameSize == 0) {
+	pPriv->video_planarbuf = 0;
+
+    /* Planar format cases */
+    } else {
+	/* Hardware-assisted planar conversion only works on 16-byte aligned addresses */
+	pPriv->video_planarbuf = SavageAllocateMemory(
+	    pScrn, &pPriv->video_planarmem,
+	    ((planarFrameSize + 0xF) & ~0xF));
+	if (pPriv->video_planarbuf != 0) {
+	    /* TODO: stop any pending conversions when buffers change... */
+	    pPriv->video_planarbuf = ((pPriv->video_planarbuf + 0xF) & ~0xF);
+	} else {
+	    /* Fallback using software conversion */
+	}
+    }
 
     /* copy data */
     top = y1 >> 16;
@@ -1951,7 +1980,6 @@ SavagePutImage(
     left <<= 1;
 
     offset = (pPriv->video_offset) + (top * dstPitch);
-    /*offset = pPriv->area->box.y1 * psav->lDelta;*/
     dst_start = (psav->FBBase + ((offset + left) & ~BASE_PAD));
 
     switch(id) {
@@ -1962,13 +1990,15 @@ SavagePutImage(
 	offsetU += tmp;
 	offsetV += tmp;
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
-        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv && (npixels & 0xF) == 0) {
+        if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv && (npixels & 0xF) == 0 && pPriv->video_planarbuf != 0) {
             SavageCopyPlanarDataBCI(
                 pScrn,
 	    	buf + (top * srcPitch) + (left >> 1), 
 	    	buf + offsetV, 
 	    	buf + offsetU, 
-	    	dst_start, srcPitch, srcPitch2, dstPitch, nlines, npixels);
+	    	dst_start,
+	    	pPriv->video_planarbuf,
+	    	srcPitch, srcPitch2, dstPitch, nlines, npixels);
         } else {
 	    SavageCopyPlanarData(
 	    	buf + (top * srcPitch) + (left >> 1), 
