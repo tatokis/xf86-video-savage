@@ -2206,10 +2206,11 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     /* Check LCD panel information */
 
     if(psav->DisplayType == MT_LCD)
-    {
 	SavageGetPanelInfo(pScrn);
+
+    /* DisplayType will be reset if panel is not active */
+    if(psav->DisplayType == MT_LCD)
 	SavageAddPanelMode(pScrn);
-    }
   
 #if 0
     if (psav->CrtOnly && !psav->UseBIOS) {
