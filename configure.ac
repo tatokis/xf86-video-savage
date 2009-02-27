@@ -111,9 +111,6 @@ if test "x$XSERVER_LIBPCIACCESS" = xyes; then
 fi
 AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
 
-# Required by exa.h
-AC_DEFINE(EXA_DRIVER_KNOWN_MAJOR, 3, [Major version of EXA we can handle])
-
 AC_SUBST([DRI_CFLAGS])
 AC_SUBST([XORG_CFLAGS])
 AC_SUBST([moduledir])
