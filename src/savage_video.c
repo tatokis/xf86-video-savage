@@ -1965,7 +1965,7 @@ SavagePutImage(
 
     /* Check whether AGP buffers can be allocated. If not, fall back to ordinary
        upload to framebuffer (slower) */
-    if (!pPriv->tried_agp && !psav->IsPCI && psav->drmFD > 0) {
+    if (!pPriv->tried_agp && !psav->IsPCI && psav->drmFD > 0 && psav->DRIServerInfo != NULL) {
         int ret;
 	SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
         
