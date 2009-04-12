@@ -1048,8 +1048,12 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 
 	if (pPriv->agpBufferMap != NULL) {
 	    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-	    drmUnmap(pPriv->agpBufferMap, pSAVAGEDRIServer->agpXVideo.size);
-	    pSAVAGEDRIServer->agpXVideo.map = NULL;
+
+            /* agpXVideo is reused to implement UploadToScreen in EXA */            
+            if (!psav->useEXA) {
+	        drmUnmap(pPriv->agpBufferMap, pSAVAGEDRIServer->agpXVideo.size);
+	        pSAVAGEDRIServer->agpXVideo.map = NULL;
+            }
 	    pPriv->agpBufferMap = NULL;
 	    pPriv->agpBufferOffset = 0;
 	}
@@ -1971,7 +1975,8 @@ SavagePutImage(
         
 	pPriv->tried_agp = TRUE;
 	if (pSAVAGEDRIServer->agpXVideo.size >= max(new_size, planarFrameSize)) {
-	    if ( drmMap( psav->drmFD,
+	    if (pSAVAGEDRIServer->agpXVideo.map == NULL &&
+	        drmMap( psav->drmFD,
 		pSAVAGEDRIServer->agpXVideo.handle,
 		pSAVAGEDRIServer->agpXVideo.size,
 		&pSAVAGEDRIServer->agpXVideo.map ) < 0 ) {

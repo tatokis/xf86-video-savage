@@ -463,10 +463,73 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
     BCI_GET_PTR;
     int i, j, dwords, queue, Bpp;
     unsigned int cmd;
-    CARD32 * srcp; 
+    CARD32 * srcp;
+    unsigned int dst_pitch;
+    unsigned int dst_yoffset;
+    int agp_possible;
     
+    exaWaitSync(pDst->drawable.pScreen);
+
     Bpp = pDst->drawable.bitsPerPixel / 8;
 
+    /* Test for conditions for AGP Mastered Image Transfer (MIT). AGP memory
+       needs to be available, the XVideo AGP needs to be enabled, the 
+       framebuffer destination must be a multiple of 32 bytes, and the source
+       pitch must span the entirety of the destination pitch. This last 
+       condition allows the code to consider this upload as equivalent to a 
+       plain memcpy() call. */
+    dst_pitch = exaGetPixmapPitch(pDst);
+    dst_yoffset = exaGetPixmapOffset(pDst) + y * dst_pitch;
+    agp_possible = 
+        (!psav->IsPCI && psav->drmFD > 0 && psav->DRIServerInfo != NULL &&
+        psav->DRIServerInfo->agpXVideo.size > 0 &&
+        x == 0 && src_pitch == dst_pitch && w * Bpp == dst_pitch &&
+        (dst_yoffset & 0x1f) == 0);
+
+    if (agp_possible) {
+      	SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
+        if (pSAVAGEDRIServer->agpXVideo.map != NULL || 
+            0 <= drmMap( psav->drmFD,
+		pSAVAGEDRIServer->agpXVideo.handle,
+		pSAVAGEDRIServer->agpXVideo.size,
+		&pSAVAGEDRIServer->agpXVideo.map)) {
+        
+            unsigned char * agpMap = pSAVAGEDRIServer->agpXVideo.map;
+            unsigned int agpOffset = drmAgpBase(psav->drmFD) + pSAVAGEDRIServer->agpXVideo.offset;
+            unsigned int bytesTotal = dst_pitch * h;            
+
+            while (bytesTotal > 0) {
+                unsigned int bytesTransfer = 
+                    (bytesTotal > pSAVAGEDRIServer->agpXVideo.size) 
+                    ? pSAVAGEDRIServer->agpXVideo.size 
+                    : bytesTotal;
+                unsigned int qwordsTransfer = bytesTransfer >> 3;
+
+                /* Copy source into AGP buffer */
+                memcpy(agpMap, src, bytesTransfer);
+                
+                psav->WaitQueue(psav,6);
+                BCI_SEND(BCI_SET_REGISTER | BCI_SET_REGISTER_COUNT(2) | 0x51);
+                BCI_SEND(agpOffset | 3);        /* Source buffer in AGP memory */
+                BCI_SEND(dst_yoffset);          /* Destination buffer in framebuffer */
+
+                BCI_SEND(BCI_SET_REGISTER | BCI_SET_REGISTER_COUNT(1) | 0x50);
+                BCI_SEND(0x00000002 | ((qwordsTransfer - 1) << 3)); /* Select MIT, sysmem to framebuffer */
+
+                /* I want to wait here for any reads from AGP memory and any 
+                   framebuffer writes performed by the MIT to stop. */
+                BCI_SEND(0xC0000000 | ((0x08 | 0x01) << 16));
+
+                bytesTotal -= bytesTransfer;
+                src += bytesTransfer;
+                dst_yoffset += bytesTransfer;
+            }
+            exaMarkSync(pDst->drawable.pScreen);
+            return TRUE;
+        }
+    }
+
+    /* If we reach here, AGP transfer is not possible, or failed to drmMap() */
     psav->sbd_offset = exaGetPixmapOffset(pDst);
     psav->sbd_high = SavageSetBD(psav, pDst);
 
@@ -515,7 +578,7 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
     }
 
     /*exaWaitSync(pDst->drawable.pScreen);*/
-
+    exaMarkSync(pDst->drawable.pScreen);
     return TRUE;
 }
 
