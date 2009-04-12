@@ -1578,6 +1578,9 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
 	psav->AccelInfoRec->NeedToSync = TRUE;
 }
 
+/* Definition in savage_accel.c */
+int SavageGetCopyROP(int rop);
+
 static void 
 SAVAGEDRISetupForScreenToScreenCopy(
     ScrnInfoPtr pScrn,
@@ -1591,7 +1594,7 @@ SAVAGEDRISetupForScreenToScreenCopy(
     int cmd =0;
 
     cmd = BCI_CMD_RECT | BCI_CMD_DEST_PBD | BCI_CMD_SRC_PBD_COLOR;
-    BCI_CMD_SET_ROP( cmd, XAAGetCopyROP(rop) );
+    BCI_CMD_SET_ROP( cmd, SavageGetCopyROP(rop) );
     if (transparency_color != -1)
         cmd |= BCI_CMD_SEND_COLOR | BCI_CMD_SRC_TRANSPARENT;
 

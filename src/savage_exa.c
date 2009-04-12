@@ -69,31 +69,8 @@ SavageDownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst, 
 #define	GXset	0xFF
 #endif
 
-static int SavageGetCopyROP(int rop) {
-
-    int ALUCopyROP[16] =
-    {
-       0x00, /*ROP_0 GXclear */
-       0x88, /*ROP_DSa GXand */
-       0x44, /*ROP_SDna GXandReverse */
-       0xCC, /*ROP_S GXcopy */
-       0x22, /*ROP_DSna GXandInverted */
-       0xAA, /*ROP_D GXnoop */
-       0x66, /*ROP_DSx GXxor */
-       0xEE, /*ROP_DSo GXor */
-       0x11, /*ROP_DSon GXnor */
-       0x99, /*ROP_DSxn GXequiv */
-       0x55, /*ROP_Dn GXinvert*/
-       0xDD, /*ROP_SDno GXorReverse */
-       0x33, /*ROP_Sn GXcopyInverted */
-       0xBB, /*ROP_DSno GXorInverted */
-       0x77, /*ROP_DSan GXnand */
-       0xFF, /*ROP_1 GXset */
-    };
-
-    return (ALUCopyROP[rop]);
-
-}
+/* Definition moved to savage_accel.c */
+int SavageGetCopyROP(int rop);
 
 static int SavageGetSolidROP(int rop) {
 
