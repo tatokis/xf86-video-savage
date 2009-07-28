@@ -42,7 +42,9 @@
 #include <unistd.h>
 #include <errno.h>
 
+#ifndef XSERVER_LIBPCIACCESS
 #include "xf86RAC.h"
+#endif
 #include "shadowfb.h"
 
 #include "globals.h"
@@ -680,7 +682,7 @@ static Bool SavagePciProbe(DriverPtr drv, int entity_num,
     }
 
     pScrn = xf86ConfigPciEntity(NULL, 0, entity_num, NULL,
-				RES_SHARED_VGA, NULL, NULL, NULL, NULL);
+				NULL, NULL, NULL, NULL, NULL);
     if (pScrn != NULL) {
 	EntityInfoPtr pEnt;
 	SavagePtr psav;
@@ -1393,20 +1395,24 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
+#ifndef XSERVER_LIBPCIACCESS
     if (pEnt->resources) {
 	xfree(pEnt);
 	SavageFreeRec(pScrn);
 	return FALSE;
     }
+#endif
     psav->EntityIndex = pEnt->index;
 
     if (xf86LoadSubModule(pScrn, "vbe")) {
 	psav->pVbe = VBEInit(NULL, pEnt->index);
     }
 
+#ifndef XSERVER_LIBPCIACCESS
     xf86RegisterResources(pEnt->index, NULL, ResNone);
     xf86SetOperatingState(resVgaIo, pEnt->index, ResUnusedOpr);
     xf86SetOperatingState(resVgaMem, pEnt->index, ResDisableOpr);
+#endif
 
     from = X_DEFAULT;
     if (pEnt->device->chipset && *pEnt->device->chipset) {
