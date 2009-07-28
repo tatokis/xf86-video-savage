@@ -42,9 +42,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
-#include "xf86RAC.h"
-#endif
 #include "shadowfb.h"
 
 #include "globals.h"
@@ -62,6 +59,10 @@
 #include "savage_regs.h"
 #include "savage_bci.h"
 #include "savage_streams.h"
+
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
+#include "xf86RAC.h"
+#endif
 
 #define TRANSPARENCY_KEY 0xff;
 
