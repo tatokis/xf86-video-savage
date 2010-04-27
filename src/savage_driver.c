@@ -1700,8 +1700,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
                    "%s DVI port support (Savage4 only)\n",(psav->dvi?"Force":"Disable"));
     }
 
-    psav->AGPforXv = FALSE;
 #ifdef XF86DRI
+    psav->AGPforXv = FALSE;
     if (xf86GetOptValBool(psav->Options, OPTION_AGP_FOR_XV, &psav->AGPforXv)) {
         if (psav->AGPforXv) {
             if (psav->agpSize == 0) {
