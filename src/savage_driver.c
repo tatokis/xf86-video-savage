@@ -4267,6 +4267,7 @@ SavageUpdateKey(ScrnInfoPtr pScrn, int r, int g, int b)
 	ol = 0;
     }
     if (!(pScreen = pScrn->pScreen) 
+	|| !psav->FBStart2nd
 	|| !(pScrOvlPriv = fbOverlayGetScrPriv(pScreen))) 
 	return;
     key = ((Shift(r,psav->overlay.redShift) & psav->overlay.redMask)
