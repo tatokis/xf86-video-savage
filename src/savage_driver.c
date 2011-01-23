@@ -4295,7 +4295,7 @@ void SavageLoadPaletteSavage4(ScrnInfoPtr pScrn, int numColors, int *indicies,
     VerticalRetraceWait();
 
     for (i=0; i<numColors; i++) {
-          if (!(inStatus1()) & 0x08)
+          if (!(inStatus1() & 0x08))
   	    VerticalRetraceWait(); 
 	index = indicies[i];
 	VGAOUT8(0x3c8, index);
