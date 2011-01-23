@@ -542,7 +542,7 @@ SavageUploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int 
 
 	if (4 * dwords <= queue) {
 	    /* WARNING: breaking BCI_PTR abstraction here */
-	    memcpy(bci_ptr, srcp, 4 * dwords);
+	    memcpy((CARD32 *)bci_ptr, srcp, 4 * dwords);
 	    bci_ptr += dwords;
 	    queue -= 4 * dwords;
 	} else {

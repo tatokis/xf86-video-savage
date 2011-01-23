@@ -2003,8 +2003,8 @@ SavagePutImage(
 	    /* This situation is expected if AGPforXv is disabled, otherwise report. */
 	    if (pSAVAGEDRIServer->agpXVideo.size > 0) {
 		xf86DrvMsg( pScreen->myNum, X_ERROR,
-		    "[agp] XVideo: not enough space in buffer (got %ld bytes, required %ld bytes).\n", 
-	    	    pSAVAGEDRIServer->agpXVideo.size, max(new_size, planarFrameSize));
+		    "[agp] XVideo: not enough space in buffer (got %ld bytes, required %d bytes).\n", 
+	    	    (long int)pSAVAGEDRIServer->agpXVideo.size, max(new_size, planarFrameSize));
 	    }
 	    pPriv->agpBufferMap = NULL;
 	    pPriv->agpBufferOffset = 0;
