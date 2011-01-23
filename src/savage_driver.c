@@ -2219,6 +2219,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
 	pSAREAPriv->ctxOwner = DRIGetContext(pScreen);
         DRIUnlock(pScreen);
         psav->LockHeld = 0;
+        SAVAGEDRISetupTiledSurfaceRegs ( psav );
     }
 #endif
     if (!SAVPTR(pScrn)->IsSecondary)

@@ -559,6 +559,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen );
 Bool SAVAGEInitMC(ScreenPtr pScreen);
 void SAVAGEDRICloseScreen( ScreenPtr pScreen );
 Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen );
+void SAVAGEDRISetupTiledSurfaceRegs ( SavagePtr psav );
 
 Bool SAVAGELockUpdate( ScrnInfoPtr pScrn, drmLockFlags flags );
 
