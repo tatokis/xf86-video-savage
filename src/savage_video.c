@@ -1038,7 +1038,6 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 {
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
     SavagePtr psav = SAVPTR(pScrn);
-    ScreenPtr pScreen = screenInfo.screens[pScrn->scrnIndex];
 
     xf86ErrorFVerb(XVTRACE,"SavageStopVideo\n");
 
@@ -1214,7 +1213,6 @@ SavageCopyPlanarDataBCI(
     unsigned long offsetV = offsetY +  srcPitch * h;
     unsigned long offsetU = offsetV +  srcPitch2 * (h>>1);
     unsigned long dstOffset  = (unsigned long)dst - (unsigned long)psav->FBBase;
-    int i;
     unsigned char memType;
     
     BCI_GET_PTR;
@@ -1975,7 +1973,6 @@ SavagePutImage(
        upload to framebuffer (slower) */
 #ifdef XF86DRI
     if (!pPriv->tried_agp && !psav->IsPCI && psav->drmFD > 0 && psav->DRIServerInfo != NULL) {
-        int ret;
 	SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
         
 	pPriv->tried_agp = TRUE;
@@ -2335,7 +2332,7 @@ SavageDisplaySurface(
 	     surface->width, surface->height, surface->pitches[0],
 	     x1, y1, x2, y2, &dstBox, src_w, src_h, drw_w, drw_h);
 
-    xf86XVFillKeyHelper(pScrn->pScreen, portPriv->colorKey, clipBoxes);
+    xf86XVFillKeyHelper(pScreen, portPriv->colorKey, clipBoxes);
 
     pPriv->isOn = TRUE;
 #if 0

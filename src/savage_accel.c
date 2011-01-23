@@ -1257,6 +1257,7 @@ void SavageSetGBD_2000(ScrnInfoPtr pScrn)
     OUTREG8(SEQ_DATA_REG,byte);
 }
 
+#if 0
 static
 void SavageRestoreAccelState(ScrnInfoPtr pScrn)
 {
@@ -1266,6 +1267,7 @@ void SavageRestoreAccelState(ScrnInfoPtr pScrn)
 
     return;
 }
+#endif
 
 /* Acceleration init function, sets up pointers to our accelerated functions */
 
@@ -1278,7 +1280,6 @@ SavageInitAccel(ScreenPtr pScreen)
 #ifdef XF86DRI
     if (psav->directRenderingEnabled) {
         SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-        BoxRec MemBox;
         int cpp = pScrn->bitsPerPixel / 8;
         int widthBytes = psav->lDelta;
         int bufferSize = ((pScrn->virtualY * widthBytes + SAVAGE_BUFFER_ALIGN)

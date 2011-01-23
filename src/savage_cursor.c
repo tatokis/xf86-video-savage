@@ -79,6 +79,7 @@ static void SavageSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
  * the HW cursor position.
  */
 
+#if 0
 static Bool
 SavageUseHWCursor(ScreenPtr pScr, CursorPtr pCurs)
 {
@@ -94,6 +95,7 @@ SavageUseHWCursor(ScreenPtr pScr, CursorPtr pCurs)
     }
     return TRUE;
 }
+#endif
 
 Bool 
 SavageHWCursorInit(ScreenPtr pScreen)
