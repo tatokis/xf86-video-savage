@@ -487,7 +487,8 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    }
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] %d kB allocated with handle 0x%08lx\n",
-	       pSAVAGEDRIServer->agp.size/1024, pSAVAGEDRIServer->agp.handle );
+	       pSAVAGEDRIServer->agp.size/1024,
+	       (unsigned long)pSAVAGEDRIServer->agp.handle );
 
    if ( drmAgpBind( psav->drmFD, pSAVAGEDRIServer->agp.handle, 0 ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] Could not bind memory\n" );
@@ -547,7 +548,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
 	   }
 	   xf86DrvMsg( pScreen->myNum, X_INFO,
 		       "[agp] command DMA handle = 0x%08lx\n",
-		       pSAVAGEDRIServer->cmdDma.handle );
+		       (unsigned long)pSAVAGEDRIServer->cmdDma.handle );
 	   /* not needed in the server
 	   if ( drmMap( psav->drmFD,
 			pSAVAGEDRIServer->cmdDma.handle,
@@ -573,7 +574,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
 	   }
 	   xf86DrvMsg( pScreen->myNum, X_INFO,
 		       "[agp] DMA buffers handle = 0x%08lx\n",
-		       pSAVAGEDRIServer->buffers.handle );
+		       (unsigned long)pSAVAGEDRIServer->buffers.handle );
 	   /* not needed in the server
 	   if ( drmMap( psav->drmFD,
 			pSAVAGEDRIServer->buffers.handle,
@@ -605,7 +606,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
        } else {
 	    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] agpXVideo handle = 0x%08lx\n",
-	       pSAVAGEDRIServer->agpXVideo.handle );
+	       (unsigned long)pSAVAGEDRIServer->agpXVideo.handle );
        }
    }
 
@@ -623,7 +624,7 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    /*   pSAVAGEDRIServer->agp_offset=pSAVAGEDRIServer->agpTexture.size;*/
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] agpTextures handle = 0x%08lx\n",
-	       pSAVAGEDRIServer->agpTextures.handle );
+	       (unsigned long)pSAVAGEDRIServer->agpTextures.handle );
 
    /* not needed in the server
    if ( drmMap( psav->drmFD,
@@ -675,7 +676,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
    
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[drm] aperture handle = 0x%08lx\n",
-	       pSAVAGEDRIServer->aperture.handle );
+	       (unsigned long)pSAVAGEDRIServer->aperture.handle );
 
    /*if(drmMap(psav->drmFD,
           pSAVAGEDRIServer->registers.handle,
@@ -700,7 +701,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
        } else
 	   xf86DrvMsg( pScreen->myNum, X_INFO,
 		       "[drm] PCI command DMA handle = 0x%08lx\n",
-		       pSAVAGEDRIServer->cmdDma.handle );
+		       (unsigned long)pSAVAGEDRIServer->cmdDma.handle );
    }
 
    /* Enable ShadowStatus by default for direct rendering. */
@@ -724,7 +725,7 @@ static Bool SAVAGEDRIMapInit( ScreenPtr pScreen )
        }
        xf86DrvMsg( pScreen->myNum, X_INFO,
 		   "[drm] Status handle = 0x%08lx\n",
-		   pSAVAGEDRIServer->status.handle );
+		   (unsigned long)pSAVAGEDRIServer->status.handle );
 
        if ( drmMap( psav->drmFD,
 		    pSAVAGEDRIServer->status.handle,
@@ -1216,29 +1217,29 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textureSize:0x%08x\n",pSAVAGEDRIServer->textureSize);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logTextureGranularity:0x%08x\n",pSAVAGEDRIServer->logTextureGranularity);
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:handle:0x%08lx\n",pSAVAGEDRIServer->agp.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:handle:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agp.handle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:offset:0x%08x\n",pSAVAGEDRIServer->agp.offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:size:0x%08x\n",pSAVAGEDRIServer->agp.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agp:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agp.map);
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:handle:0x%08lx\n",pSAVAGEDRIServer->registers.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:handle:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->registers.handle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:offset:0x%08x\n",pSAVAGEDRIServer->registers.offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:size:0x%08x\n",pSAVAGEDRIServer->registers.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	registers:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->registers.map);
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:handle:0x%08lx\n",pSAVAGEDRIServer->status.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:handle:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->status.handle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:offset:0x%08x\n",pSAVAGEDRIServer->status.offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:size:0x%08x\n",pSAVAGEDRIServer->status.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	status:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->status.map);
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:handle:0x%08lx\n",pSAVAGEDRIServer->agpTextures.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:handle:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agpTextures.handle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:offset:0x%08x\n",pSAVAGEDRIServer->agpTextures.offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextures:size:0x%08x\n",pSAVAGEDRIServer->agpTextures.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apgTextures:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->agpTextures.map);
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRIServer->logAgpTextureGranularity); 
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:handle:0x%08lx\n",pSAVAGEDRIServer->cmdDma.handle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:handle:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->cmdDma.handle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:offset:0x%08x\n",pSAVAGEDRIServer->cmdDma.offset);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:size:0x%08x\n",pSAVAGEDRIServer->cmdDma.size);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	cmdDma:map:0x%08lx\n",(unsigned long)pSAVAGEDRIServer->cmdDma.map);
@@ -1268,15 +1269,15 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	textureSize:0x%08x\n",pSAVAGEDRI->textureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logTextureGranularity:0x%08x\n",pSAVAGEDRI->logTextureGranularity );
    
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureHandle:0x%08lx\n",pSAVAGEDRI->agpTextureHandle );
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureHandle:0x%08lx\n",(unsigned long)pSAVAGEDRI->agpTextureHandle );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	agpTextureSize:0x%08x\n",pSAVAGEDRI->agpTextureSize );
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	logAgpTextureGranularity:0x%08x\n",pSAVAGEDRI->logAgpTextureGranularity );
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apertureHandle:0x%08lx\n",pSAVAGEDRI->apertureHandle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apertureHandle:0x%08lx\n",(unsigned long)pSAVAGEDRI->apertureHandle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	apertureSize:0x%08x\n",pSAVAGEDRI->apertureSize);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	aperturePitch:0x%08x\n",pSAVAGEDRI->aperturePitch);
 
-   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	statusHandle:0x%08lx\n",pSAVAGEDRI->statusHandle);
+   xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	statusHandle:0x%08lx\n",(unsigned long)pSAVAGEDRI->statusHandle);
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	statusSize:0x%08x\n",pSAVAGEDRI->statusSize);
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08x\n",pSAVAGEDRI->sarea_priv_offset);
