@@ -652,7 +652,7 @@ static void SavageFreeRec(ScrnInfoPtr pScrn)
     if (!pScrn->driverPrivate)
 	return;
     SavageUnmapMem(pScrn, 1);
-    xfree(pScrn->driverPrivate);
+    free(pScrn->driverPrivate);
     pScrn->driverPrivate = NULL;
 }
 
@@ -761,7 +761,7 @@ static Bool SavageProbe(DriverPtr drv, int flags)
 	return FALSE;
     if (xf86GetPciVideoInfo() == NULL) {
         if (devSections)
-	    xfree(devSections);
+	    free(devSections);
         return FALSE;
     }
 
@@ -770,7 +770,7 @@ static Bool SavageProbe(DriverPtr drv, int flags)
 				    devSections, numDevSections, drv,
 				    &usedChips);
     if (devSections)
-	xfree(devSections);
+	free(devSections);
     devSections = NULL;
     if (numUsed <= 0)
 	return FALSE;
@@ -850,11 +850,11 @@ static Bool SavageProbe(DriverPtr drv, int flags)
 		    pSavageEnt->HasSecondary = TRUE;
 		}
 	    }
-	    xfree(pEnt);
+	    free(pEnt);
 	}
 
 
-    xfree(usedChips);
+    free(usedChips);
     return foundScreen;
 }
 
@@ -1060,7 +1060,7 @@ static void SavageGetPanelInfo(ScrnInfoPtr pScrn)
 	    if (!pScrn->monitor->maxPixClock)
 		pScrn->monitor->maxPixClock = native->Clock;
 
-	    xfree(native);
+	    free(native);
 	} while (0);
 
 	if( psav->LCDClock > 0.0 )
@@ -1196,7 +1196,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if (pScrn->depth == 8)
 	pScrn->rgbBits = 8;
 
-    if (!(psav->Options = xalloc(sizeof(SavageOptions))))
+    if (!(psav->Options = malloc(sizeof(SavageOptions))))
 	return FALSE;
     memcpy(psav->Options, SavageOptions, sizeof(SavageOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, psav->Options);
@@ -1398,7 +1398,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
 #ifndef XSERVER_LIBPCIACCESS
     if (pEnt->resources) {
-	xfree(pEnt);
+	free(pEnt);
 	SavageFreeRec(pScrn);
 	return FALSE;
     }
@@ -1449,7 +1449,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if (pEnt->device->videoRam != 0)
     	pScrn->videoRam = pEnt->device->videoRam;
 
-    xfree(pEnt);
+    free(pEnt);
 
 #ifndef XSERVER_LIBPCIACCESS
     psav->PciTag = pciTag(psav->PciInfo->bus, psav->PciInfo->device,
@@ -3552,7 +3552,7 @@ static int SavageInternalScreenInit(int scrnIndex, ScreenPtr pScreen)
   
     if(psav->shadowFB) {
 	psav->ShadowPitch = BitmapBytePad(pScrn->bitsPerPixel * width);
-	psav->ShadowPtr = xalloc(psav->ShadowPitch * height);
+	psav->ShadowPtr = malloc(psav->ShadowPitch * height);
 	displayWidth = psav->ShadowPitch / (pScrn->bitsPerPixel >> 3);
 	FBStart = psav->ShadowPtr;
     } else {
@@ -4001,7 +4001,7 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
     }
 
     if( psav->DGAModes ) {
-	xfree( psav->DGAModes );
+	free( psav->DGAModes );
 	psav->DGAModes = NULL;
 	psav->numDGAModes = 0;
     }

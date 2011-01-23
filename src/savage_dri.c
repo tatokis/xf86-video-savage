@@ -105,24 +105,24 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
    case 16:
       numConfigs = 8;
 
-      pConfigs = (__GLXvisualConfig*)xcalloc( sizeof(__GLXvisualConfig),
+      pConfigs = (__GLXvisualConfig*)calloc( sizeof(__GLXvisualConfig),
 						numConfigs );
       if ( !pConfigs ) {
 	 return FALSE;
       }
 
-      pSAVAGEConfigs = (SAVAGEConfigPrivPtr)xcalloc( sizeof(SAVAGEConfigPrivRec),
+      pSAVAGEConfigs = (SAVAGEConfigPrivPtr)calloc( sizeof(SAVAGEConfigPrivRec),
 						 numConfigs );
       if ( !pSAVAGEConfigs ) {
-	 xfree( pConfigs );
+	 free( pConfigs );
 	 return FALSE;
       }
 
-      pSAVAGEConfigPtrs = (SAVAGEConfigPrivPtr*)xcalloc( sizeof(SAVAGEConfigPrivPtr),
+      pSAVAGEConfigPtrs = (SAVAGEConfigPrivPtr*)calloc( sizeof(SAVAGEConfigPrivPtr),
 						     numConfigs );
       if ( !pSAVAGEConfigPtrs ) {
-	 xfree( pConfigs );
-	 xfree( pSAVAGEConfigs );
+	 free( pConfigs );
+	 free( pSAVAGEConfigs );
 	 return FALSE;
       }
 
@@ -201,24 +201,24 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
    case 32:
       numConfigs = 8;
 
-      pConfigs = (__GLXvisualConfig*)xcalloc( sizeof(__GLXvisualConfig),
+      pConfigs = (__GLXvisualConfig*)calloc( sizeof(__GLXvisualConfig),
 						numConfigs );
       if ( !pConfigs ) {
 	 return FALSE;
       }
 
-      pSAVAGEConfigs = (SAVAGEConfigPrivPtr)xcalloc( sizeof(SAVAGEConfigPrivRec),
+      pSAVAGEConfigs = (SAVAGEConfigPrivPtr)calloc( sizeof(SAVAGEConfigPrivRec),
 						 numConfigs );
       if ( !pSAVAGEConfigs ) {
-	 xfree( pConfigs );
+	 free( pConfigs );
 	 return FALSE;
       }
 
-      pSAVAGEConfigPtrs = (SAVAGEConfigPrivPtr*)xcalloc( sizeof(SAVAGEConfigPrivPtr),
+      pSAVAGEConfigPtrs = (SAVAGEConfigPrivPtr*)calloc( sizeof(SAVAGEConfigPrivPtr),
 						     numConfigs );
       if ( !pSAVAGEConfigPtrs ) {
-	 xfree( pConfigs );
-	 xfree( pSAVAGEConfigs );
+	 free( pConfigs );
+	 free( pSAVAGEConfigs );
 	 return FALSE;
       }
 
@@ -906,7 +906,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    if (xf86LoaderCheckSymbol("DRICreatePCIBusID")) {
       pDRIInfo->busIdString = DRICreatePCIBusID(psav->PciInfo);
    } else {
-      pDRIInfo->busIdString            = xalloc(64);
+      pDRIInfo->busIdString            = malloc(64);
       sprintf(pDRIInfo->busIdString,
               "PCI:%d:%d:%d",
               psav->PciInfo->bus,
@@ -960,7 +960,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
 
    pDRIInfo->SAREASize = SAREA_MAX;
 
-   pSAVAGEDRI = (SAVAGEDRIPtr)xcalloc( sizeof(SAVAGEDRIRec), 1 );
+   pSAVAGEDRI = (SAVAGEDRIPtr)calloc( sizeof(SAVAGEDRIRec), 1 );
    if ( !pSAVAGEDRI ) {
       DRIDestroyInfoRec( psav->pDRIInfo );
       psav->pDRIInfo = 0;
@@ -970,9 +970,9 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    }
 
    pSAVAGEDRIServer = (SAVAGEDRIServerPrivatePtr)
-      xcalloc( sizeof(SAVAGEDRIServerPrivateRec), 1 );
+      calloc( sizeof(SAVAGEDRIServerPrivateRec), 1 );
    if ( !pSAVAGEDRIServer ) {
-      xfree( pSAVAGEDRI );
+      free( pSAVAGEDRI );
       DRIDestroyInfoRec( psav->pDRIInfo );
       psav->pDRIInfo = 0;
       xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
@@ -998,9 +998,9 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    pDRIInfo->bufferRequests = DRI_ALL_WINDOWS;
 
    if ( !DRIScreenInit( pScreen, pDRIInfo, &psav->drmFD ) ) {
-      xfree( pSAVAGEDRIServer );
+      free( pSAVAGEDRIServer );
       psav->DRIServerInfo = 0;
-      xfree( pDRIInfo->devPrivate );
+      free( pDRIInfo->devPrivate );
       pDRIInfo->devPrivate = 0;
       DRIDestroyInfoRec( psav->pDRIInfo );
       psav->pDRIInfo = 0;
@@ -1361,21 +1361,21 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen )
 
    if ( psav->pDRIInfo ) {
       if ( psav->pDRIInfo->devPrivate ) {
-	 xfree( psav->pDRIInfo->devPrivate );
+	 free( psav->pDRIInfo->devPrivate );
 	 psav->pDRIInfo->devPrivate = 0;
       }
       DRIDestroyInfoRec( psav->pDRIInfo );
       psav->pDRIInfo = 0;
    }
    if ( psav->DRIServerInfo ) {
-      xfree( psav->DRIServerInfo );
+      free( psav->DRIServerInfo );
       psav->DRIServerInfo = 0;
    }
    if ( psav->pVisualConfigs ) {
-      xfree( psav->pVisualConfigs );
+      free( psav->pVisualConfigs );
    }
    if ( psav->pVisualConfigsPriv ) {
-      xfree( psav->pVisualConfigsPriv );
+      free( psav->pVisualConfigsPriv );
    }
 }
 
@@ -1466,11 +1466,11 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
 
         if (nbox>1) {
 	    /* Keep ordering in each band, reverse order of bands */
-	    pboxNew1 = xalloc(sizeof(BoxRec)*nbox);
+	    pboxNew1 = malloc(sizeof(BoxRec)*nbox);
 	    if (!pboxNew1) return;
-	    pptNew1 = xalloc(sizeof(DDXPointRec)*nbox);
+	    pptNew1 = malloc(sizeof(DDXPointRec)*nbox);
 	    if (!pptNew1) {
-	        xfree(pboxNew1);
+	        free(pboxNew1);
 	        return;
 	    }
 	    pboxBase = pboxNext = pbox+nbox-1;
@@ -1501,14 +1501,14 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
 
         if (nbox > 1) {
 	    /*reverse orderof rects in each band */
-	    pboxNew2 = xalloc(sizeof(BoxRec)*nbox);
-	    pptNew2 = xalloc(sizeof(DDXPointRec)*nbox);
+	    pboxNew2 = malloc(sizeof(BoxRec)*nbox);
+	    pptNew2 = malloc(sizeof(DDXPointRec)*nbox);
 	    if (!pboxNew2 || !pptNew2) {
-	        if (pptNew2) xfree(pptNew2);
-	        if (pboxNew2) xfree(pboxNew2);
+	        if (pptNew2) free(pptNew2);
+	        if (pboxNew2) free(pboxNew2);
 	        if (pboxNew1) {
-		    xfree(pptNew1);
-		    xfree(pboxNew1);
+		    free(pptNew1);
+		    free(pboxNew1);
 		}
 	       return;
 	    }
@@ -1563,12 +1563,12 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
     SAVAGESelectBuffer(pScrn, SAVAGE_FRONT);
 
     if (pboxNew2) {
-        xfree(pptNew2);
-        xfree(pboxNew2);
+        free(pptNew2);
+        free(pboxNew2);
     }
     if (pboxNew1) {
-        xfree(pptNew1);
-        xfree(pboxNew1);
+        free(pptNew1);
+        free(pboxNew1);
     }
 
     BCI_SEND(0xc0020000); /* wait for 2D idle */
