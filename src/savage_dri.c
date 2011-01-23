@@ -1457,7 +1457,7 @@ SAVAGEDRIMoveBuffers(WindowPtr pParent, DDXPointRec ptOldOrg,
     pboxNew1 = 0;
     pptNew1 = 0;
     pboxNew2 = 0;
-    pboxNew2 = 0;
+    pptNew2 = 0;
     pptSrc = &ptOldOrg;
 
     dx = pParent->drawable.x - ptOldOrg.x;
