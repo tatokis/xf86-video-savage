@@ -1078,6 +1078,49 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    return TRUE;
 }
 
+void SAVAGEDRISetupTiledSurfaceRegs( SavagePtr psav )
+{
+      SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
+      unsigned int value = 0;
+      
+      OUTREG(0x850C,(INREG(0x850C) | 0x00008000)); /* AGD: I don't think this does anything on 3D/MX/IX */
+						   /* maybe savage4 too... */
+      /* we don't use Y range flag,so comment it */
+      /*
+        if(pSAVAGEDRI->width <= 1024)
+            value |= (1<<29);
+      */
+      if ((psav->Chipset == S3_SAVAGE_MX) /* 3D/MX/IX seem to set up the tile stride differently */
+	|| (psav->Chipset == S3_SAVAGE3D)) {
+      	    if(pSAVAGEDRI->cpp == 2)
+      	    {
+         	value |=  ((psav->lDelta / 4) >> 5) << 24;
+         	value |= 2<<30;
+      	    } else {
+         	value |=  ((psav->lDelta / 4) >> 5) << 24;
+         	value |= 3<<30;
+      	    }
+
+	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset) ); /* front */ 
+	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset) ); /* back  */
+	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset) ); /* depth */
+      } else {
+	    int offset_shift = 5;
+      	    if(pSAVAGEDRI->cpp == 2)
+      	    {
+         	value |=  (((pSAVAGEDRI->width + 0x3F) & 0xFFC0) >> 6) << 20;
+         	value |= 2<<30;
+      	    } else {
+         	value |=  (((pSAVAGEDRI->width + 0x1F) & 0xFFE0) >> 5) << 20;
+         	value |= 3<<30;
+      	    }
+	    if (psav->Chipset == S3_SUPERSAVAGE) /* supersavages have a different shift */
+		offset_shift = 6;
+	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> offset_shift) ); /* front */
+	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset >> offset_shift) ); /* back  */
+	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset >> offset_shift) ); /* depth */
+      }
+}
 
 Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 {
@@ -1149,48 +1192,6 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    pSAVAGEDRI->apertureHandle	= pSAVAGEDRIServer->aperture.handle;
    pSAVAGEDRI->apertureSize	= pSAVAGEDRIServer->aperture.size;
    pSAVAGEDRI->aperturePitch    = psav->ulAperturePitch;
-
-   {
-      unsigned int value = 0;
-      
-      OUTREG(0x850C,(INREG(0x850C) | 0x00008000)); /* AGD: I don't think this does anything on 3D/MX/IX */
-						   /* maybe savage4 too... */
-      /* we don't use Y range flag,so comment it */
-      /*
-        if(pSAVAGEDRI->width <= 1024)
-            value |= (1<<29);
-      */
-      if ((psav->Chipset == S3_SAVAGE_MX) /* 3D/MX/IX seem to set up the tile stride differently */
-	|| (psav->Chipset == S3_SAVAGE3D)) {
-      	    if(pSAVAGEDRI->cpp == 2)
-      	    {
-         	value |=  ((psav->lDelta / 4) >> 5) << 24;
-         	value |= 2<<30;
-      	    } else {
-         	value |=  ((psav->lDelta / 4) >> 5) << 24;
-         	value |= 3<<30;
-      	    }
-
-	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset) ); /* front */ 
-	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset) ); /* back  */
-	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset) ); /* depth */
-      } else {
-	    int offset_shift = 5;
-      	    if(pSAVAGEDRI->cpp == 2)
-      	    {
-         	value |=  (((pSAVAGEDRI->width + 0x3F) & 0xFFC0) >> 6) << 20;
-         	value |= 2<<30;
-      	    } else {
-         	value |=  (((pSAVAGEDRI->width + 0x1F) & 0xFFE0) >> 5) << 20;
-         	value |= 3<<30;
-      	    }
-	    if (psav->Chipset == S3_SUPERSAVAGE) /* supersavages have a different shift */
-		offset_shift = 6;
-	    OUTREG(TILED_SURFACE_REGISTER_0, value|(pSAVAGEDRI->frontOffset >> offset_shift) ); /* front */
-	    OUTREG(TILED_SURFACE_REGISTER_1, value|(pSAVAGEDRI->backOffset >> offset_shift) ); /* back  */
-	    OUTREG(TILED_SURFACE_REGISTER_2, value|(pSAVAGEDRI->depthOffset >> offset_shift) ); /* depth */
-      }
-   }
    
    pSAVAGEDRI->statusHandle	= pSAVAGEDRIServer->status.handle;
    pSAVAGEDRI->statusSize	= pSAVAGEDRIServer->status.size;
@@ -1282,6 +1283,7 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
 
    xf86DrvMsg( pScrn->scrnIndex, X_INFO, "[junkers]	sarea_priv_offset:0x%08x\n",pSAVAGEDRI->sarea_priv_offset);
     
+   SAVAGEDRISetupTiledSurfaceRegs( psav );
    return TRUE;
 }
 
