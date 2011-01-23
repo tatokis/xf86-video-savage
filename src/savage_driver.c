@@ -648,7 +648,7 @@ static Bool SavageGetRec(ScrnInfoPtr pScrn)
 
 static void SavageFreeRec(ScrnInfoPtr pScrn)
 {
-    TRACE(( "SavageFreeRec(%x)\n", pScrn->driverPrivate ));
+    TRACE(( "SavageFreeRec(%p)\n", pScrn->driverPrivate ));
     if (!pScrn->driverPrivate)
 	return;
     SavageUnmapMem(pScrn, 1);
@@ -3062,7 +3062,7 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
 {
     SavagePtr psav = SAVPTR(pScrn);
 
-    TRACE(("SavageUnmapMem(%x,%x)\n", psav->MapBase, psav->FBBase));
+    TRACE(("SavageUnmapMem(%p,%p)\n", psav->MapBase, psav->FBBase));
 
     if (psav->PrimaryVidMapped) {
         vgaHWUnmapMem(pScrn);
@@ -4064,7 +4064,7 @@ SavageDoAdjustFrame(ScrnInfoPtr pScrn, int x, int y, int crtc2)
     SavagePtr psav = SAVPTR(pScrn);
     int address=0,top=0,left=0,tile_height,tile_size;
     
-    TRACE(("SavageDoAdjustFrame(%d,%d,%x)\n", x, y, flags));
+    TRACE(("SavageDoAdjustFrame(%d,%d,%d)\n", x, y, crtc2));
 
     if (psav->Chipset == S3_SAVAGE2000) {
         tile_height = TILEHEIGHT_2000; /* 32 */
