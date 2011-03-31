@@ -3666,7 +3666,7 @@ static Bool SavageModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
 
-    TRACE(("SavageModeInit(%dx%d, %dHz)\n", 
+    TRACE(("SavageModeInit(%dx%d, %dkHz)\n", 
 	mode->HDisplay, mode->VDisplay, mode->Clock));
     
 #if 0
