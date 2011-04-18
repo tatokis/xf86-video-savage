@@ -561,20 +561,6 @@ void SAVAGEDRICloseScreen( ScreenPtr pScreen );
 Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen );
 void SAVAGEDRIResume( ScreenPtr pScreen );
 
-Bool SAVAGELockUpdate( ScrnInfoPtr pScrn, drmLockFlags flags );
-
-#if 0
-void SAVAGEGetQuiescence( ScrnInfoPtr pScrn );
-void SAVAGEGetQuiescenceShared( ScrnInfoPtr pScrn );
-#endif
-
-void SAVAGESelectBuffer(ScrnInfoPtr pScrn, int which);
-
-#if 0
-Bool SAVAGECleanupDma(ScrnInfoPtr pScrn);
-Bool SAVAGEInitDma(ScrnInfoPtr pScrn, int prim_size);
-#endif
-
 #define SAVAGE_AGP_1X_MODE		0x01
 #define SAVAGE_AGP_2X_MODE		0x02
 #define SAVAGE_AGP_4X_MODE		0x04

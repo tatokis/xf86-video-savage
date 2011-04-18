@@ -386,7 +386,7 @@ static void SAVAGEBlockHandler( int screenNum, pointer blockData,
    psav->pDRIInfo->wrap.BlockHandler = SAVAGEBlockHandler;
 }
 
-void SAVAGESelectBuffer( ScrnInfoPtr pScrn, int which )
+static void SAVAGESelectBuffer( ScrnInfoPtr pScrn, int which )
 {
    SavagePtr psav = SAVPTR(pScrn);
    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
