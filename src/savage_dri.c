@@ -426,29 +426,11 @@ static unsigned int mylog2( unsigned int n )
    return log2;
 }
 
-static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
+static Bool SAVAGESetAgpMode(SavagePtr psav, ScreenPtr pScreen)
 {
-   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-   SavagePtr psav = SAVPTR(pScrn);
-   SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
-   unsigned long mode;
-   unsigned int vendor, device;
-   unsigned int offset;
-   int ret;
-
-   if (psav->agpSize < 2) psav->agpSize = 2; /* at least 2MB for DMA buffers */
-
-   pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
-   pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size; /* ? */
-
-   if ( drmAgpAcquire( psav->drmFD ) < 0 ) {
-      xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not available\n" );
-      return FALSE;
-   }
-
-   mode   = drmAgpGetMode( psav->drmFD );        /* Default mode */
-   vendor = drmAgpVendorId( psav->drmFD );
-   device = drmAgpDeviceId( psav->drmFD );
+   unsigned long mode = drmAgpGetMode( psav->drmFD );    /* Default mode */
+   unsigned int vendor = drmAgpVendorId( psav->drmFD );
+   unsigned int device = drmAgpDeviceId( psav->drmFD );
 
    mode &= ~SAVAGE_AGP_MODE_MASK;
 
@@ -462,8 +444,6 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
       mode |= SAVAGE_AGP_1X_MODE;
    }
 
-   /*   mode |= SAVAGE_AGP_1X_MODE;*/
-
    xf86DrvMsg( pScreen->myNum, X_INFO,
 	       "[agp] Mode 0x%08lx [AGP 0x%04x/0x%04x; Card 0x%04x/0x%04x]\n",
 	       mode, vendor, device,
@@ -473,6 +453,32 @@ static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
    if ( drmAgpEnable( psav->drmFD, mode ) < 0 ) {
       xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not enabled\n" );
       drmAgpRelease( psav->drmFD );
+      return FALSE;
+   }
+
+   return TRUE;
+}
+
+static Bool SAVAGEDRIAgpInit(ScreenPtr pScreen)
+{
+   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+   SavagePtr psav = SAVPTR(pScrn);
+   SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
+   unsigned int offset;
+   int ret;
+
+   if (psav->agpSize < 2)
+      psav->agpSize = 2; /* at least 2MB for DMA buffers */
+
+   pSAVAGEDRIServer->agp.size = psav->agpSize * 1024 * 1024;
+   pSAVAGEDRIServer->agp.offset = pSAVAGEDRIServer->agp.size; /* ? */
+
+   if ( drmAgpAcquire( psav->drmFD ) < 0 ) {
+      xf86DrvMsg( pScreen->myNum, X_ERROR, "[agp] AGP not available\n" );
+      return FALSE;
+   }
+
+   if (!SAVAGESetAgpMode(psav, pScreen)) {
       pSAVAGEDRIServer->agp.handle = 0; /* indicate that AGP init failed */
       return FALSE;
    }
@@ -1294,6 +1300,9 @@ void SAVAGEDRIResume(ScreenPtr pScreen)
    SAVAGESAREAPrivPtr pSAREAPriv =
 			(SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
 
+   if (!psav->IsPCI) {
+	SAVAGESetAgpMode(psav, pScreen);
+   }
    SAVAGEDRISetupTiledSurfaceRegs(psav);
    /* Assume that 3D state was clobbered, invalidate it by
     * changing ctxOwner in the sarea. */
