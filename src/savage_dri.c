@@ -1078,7 +1078,7 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
    return TRUE;
 }
 
-void SAVAGEDRISetupTiledSurfaceRegs( SavagePtr psav )
+static void SAVAGEDRISetupTiledSurfaceRegs( SavagePtr psav )
 {
       SAVAGEDRIPtr pSAVAGEDRI = (SAVAGEDRIPtr)psav->pDRIInfo->devPrivate;
       unsigned int value = 0;
@@ -1287,6 +1287,18 @@ Bool SAVAGEDRIFinishScreenInit( ScreenPtr pScreen )
    return TRUE;
 }
 
+void SAVAGEDRIResume(ScreenPtr pScreen)
+{
+   ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+   SavagePtr psav = SAVPTR(pScrn);
+   SAVAGESAREAPrivPtr pSAREAPriv =
+			(SAVAGESAREAPrivPtr)DRIGetSAREAPrivate(pScreen);
+
+   SAVAGEDRISetupTiledSurfaceRegs(psav);
+   /* Assume that 3D state was clobbered, invalidate it by
+    * changing ctxOwner in the sarea. */
+   pSAREAPriv->ctxOwner = DRIGetContext(pScreen);
+}
 
 void SAVAGEDRICloseScreen( ScreenPtr pScreen )
 {
