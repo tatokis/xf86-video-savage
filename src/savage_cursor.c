@@ -67,8 +67,8 @@ static void SavageSetCursorColors(ScrnInfoPtr pScrn, int bg, int fg);
 #define waitHSync(n) { \
                        int num = n; \
                        while (num--) { \
-			 while ((inStatus1()) & 0x01){};\
-                         while (!(inStatus1()) & 0x01){};\
+			 while (inStatus1() & 0x01){};\
+                         while (!(inStatus1() & 0x01)){};\
                         } \
                       } 
 #define MAX_CURS 64
