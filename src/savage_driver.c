@@ -2561,7 +2561,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 			(restore->refresh >= 75)
 		    )
 		    {
-			if( cr6d && LCD_ACTIVE )
+			if( cr6d & LCD_ACTIVE )
 			    cr79 = 0x05;
 			else
 			    cr79 = 0x08;
@@ -2578,7 +2578,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
  */
 		    if( pScrn->displayWidth == 1024 )
 		    {
-			if( cr6d && LCD_ACTIVE )
+			if( cr6d & LCD_ACTIVE )
 			    cr79 = 0x08;
 			else
 			    cr79 = 0x0e;
