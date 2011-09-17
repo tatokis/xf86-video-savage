@@ -1503,16 +1503,15 @@ SavageDisplayVideoOld(
       }
 
     if (S3_MOBILE_TWISTER_SERIES(psav->Chipset)
-        && psav->FPExpansion) {
-        drw_w = (((float)(drw_w * psav->XExp1)/(float)psav->XExp2)+1);
-        drw_h = (float)(drw_h * psav->YExp1)/(float)psav->YExp2+1;
-        dstBox->x1 = (float)(dstBox->x1 * psav->XExp1)/(float)psav->XExp2;
-        dstBox->y1 = (float)(dstBox->y1 * psav->YExp1)/(float)psav->YExp2;
+	&& psav->FPExpansion) {
+	drw_w = (drw_w * psav->XExp1) / psav->XExp2 + 1;
+	drw_h = (drw_h * psav->YExp1) / psav->YExp2 + 1;
+	dstBox->x1 = (dstBox->x1 * psav->XExp1) / psav->XExp2;
+	dstBox->y1 = (dstBox->y1 * psav->YExp1) / psav->YExp2;
 	dstBox->x2 = (dstBox->x2 * psav->XExp1) / psav->XExp2;
 	dstBox->y2 = (dstBox->y2 * psav->YExp1) / psav->YExp2;
-
-        dstBox->x1 += psav->displayXoffset;
-        dstBox->y1 += psav->displayYoffset;
+	dstBox->x1 += psav->displayXoffset;
+	dstBox->y1 += psav->displayYoffset;
 	dstBox->x2 += psav->displayXoffset;
 	dstBox->y2 += psav->displayYoffset;
     }
@@ -1668,10 +1667,10 @@ SavageDisplayVideoNew(
 	    !psav->CrtOnly &&
 	    !psav->TvOn) 
     {
-	drw_w = (drw_w * psav->XExp1)/psav->XExp2 + 1;
-	drw_h = (drw_h * psav->YExp1)/psav->YExp2 + 1;
-	dstBox->x1 = (dstBox->x1 * psav->XExp1)/psav->XExp2;
-	dstBox->y1 = (dstBox->y1 * psav->YExp1)/psav->YExp2;
+	drw_w = (drw_w * psav->XExp1) / psav->XExp2 + 1;
+	drw_h = (drw_h * psav->YExp1) / psav->YExp2 + 1;
+	dstBox->x1 = (dstBox->x1 * psav->XExp1) / psav->XExp2;
+	dstBox->y1 = (dstBox->y1 * psav->YExp1) / psav->YExp2;
 	dstBox->x2 = (dstBox->x2 * psav->XExp1) / psav->XExp2;
 	dstBox->y2 = (dstBox->y2 * psav->YExp1) / psav->YExp2;
 	dstBox->x1 += psav->displayXoffset;
