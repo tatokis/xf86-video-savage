@@ -1070,6 +1070,11 @@ Bool SAVAGEDRIScreenInit( ScreenPtr pScreen )
       return FALSE;
    }
 
+   /* Linux kernel DRM broken in 2.6.30 through 2.6.39 */
+   if (pDRIInfo->hFrameBuffer == pSAVAGEDRIServer->aperture.handle)
+       xf86DrvMsg( pScrn->scrnIndex, X_WARNING,
+		   "[drm] Detected broken drm maps. Please upgrade to linux kernel 3.x\n");
+
    if ( !SAVAGEDRIBuffersInit( pScreen ) ) {
       SAVAGEDRICloseScreen( pScreen );
       return FALSE;
