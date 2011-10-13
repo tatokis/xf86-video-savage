@@ -53,6 +53,23 @@
 #include "savage_dri.h"
 #include "savage_sarea.h"
 
+static struct {
+   int bpp;
+   int redSize;
+   int greenSize;
+   int blueSize;
+   int alphaSize;
+   int redMask;
+   int greenMask;
+   int blueMask;
+   int alphaMask;
+   int depthSize;
+} SAVAGEVisuals[] = {
+   { 16, 5, 6, 5, 0, 0x0000F800, 0x000007E0, 0x0000001F, 0, 16 },
+   { 32, 8, 8, 8, 0, 0x00FF0000, 0x0000FF00, 0x000000FF, 0, 24 },
+   {  0, 0, 0, 0, 0,          0,          0,          0, 0,  0 }
+};
+
 static char SAVAGEKernelDriverName[] = "savage";
 static char SAVAGEClientDriverName[] = "savage";
 
@@ -93,7 +110,7 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
    __GLXvisualConfig *pConfigs = 0;
    SAVAGEConfigPrivPtr pSAVAGEConfigs = 0;
    SAVAGEConfigPrivPtr *pSAVAGEConfigPtrs = 0;
-   int i, db, depth, stencil, accum;
+   int i, db, stencil, accum, visNum;
 
    switch ( pScrn->bitsPerPixel ) {
    case 8:
@@ -101,101 +118,6 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
       break;
 
    case 16:
-      numConfigs = 8;
-
-      pConfigs = (__GLXvisualConfig*)calloc( sizeof(__GLXvisualConfig),
-						numConfigs );
-      if ( !pConfigs ) {
-	 return FALSE;
-      }
-
-      pSAVAGEConfigs = (SAVAGEConfigPrivPtr)calloc( sizeof(SAVAGEConfigPrivRec),
-						 numConfigs );
-      if ( !pSAVAGEConfigs ) {
-	 free( pConfigs );
-	 return FALSE;
-      }
-
-      pSAVAGEConfigPtrs = (SAVAGEConfigPrivPtr*)calloc( sizeof(SAVAGEConfigPrivPtr),
-						     numConfigs );
-      if ( !pSAVAGEConfigPtrs ) {
-	 free( pConfigs );
-	 free( pSAVAGEConfigs );
-	 return FALSE;
-      }
-
-      for ( i = 0 ; i < numConfigs ; i++ ) {
-	 pSAVAGEConfigPtrs[i] = &pSAVAGEConfigs[i];
-      }
-
-      i = 0;
-      depth = 1;
-      for ( accum = 0 ; accum <= 1 ; accum++ ) {
-         for ( stencil = 0 ; stencil <= 1 ; stencil++ ) {
-            for ( db = 1 ; db >= 0 ; db-- ) {
-               pConfigs[i].vid			= -1;
-               pConfigs[i].class		= -1;
-               pConfigs[i].rgba			= TRUE;
-               pConfigs[i].redSize		= 5;
-               pConfigs[i].greenSize		= 6;
-               pConfigs[i].blueSize		= 5;
-               pConfigs[i].alphaSize		= 0;
-               pConfigs[i].redMask		= 0x0000F800;
-               pConfigs[i].greenMask		= 0x000007E0;
-               pConfigs[i].blueMask		= 0x0000001F;
-               pConfigs[i].alphaMask		= 0;
-               if ( accum ) {
-                  pConfigs[i].accumRedSize	= 16;
-                  pConfigs[i].accumGreenSize	= 16;
-                  pConfigs[i].accumBlueSize	= 16;
-                  pConfigs[i].accumAlphaSize	= 0;
-               } else {
-                  pConfigs[i].accumRedSize	= 0;
-                  pConfigs[i].accumGreenSize	= 0;
-                  pConfigs[i].accumBlueSize	= 0;
-                  pConfigs[i].accumAlphaSize	= 0;
-               }
-               if ( db ) {
-                  pConfigs[i].doubleBuffer	= TRUE;
-               } else {
-                  pConfigs[i].doubleBuffer	= FALSE;
-	       }
-               pConfigs[i].stereo		= FALSE;
-               pConfigs[i].bufferSize		= 16;
-               if ( depth ) {
-                  pConfigs[i].depthSize		= 16;
-               } else {
-                  pConfigs[i].depthSize		= 0;
-	       }
-               if ( stencil ) {
-                  pConfigs[i].stencilSize	= 8;
-               } else {
-                  pConfigs[i].stencilSize	= 0;
-	       }
-               pConfigs[i].auxBuffers		= 0;
-               pConfigs[i].level		= 0;
-               if ( accum || stencil ) {
-		  pConfigs[i].visualRating	= GLX_SLOW_CONFIG;
-               } else {
-                  pConfigs[i].visualRating	= GLX_NONE;
-	       }
-               pConfigs[i].transparentPixel	= GLX_NONE;
-               pConfigs[i].transparentRed	= 0;
-               pConfigs[i].transparentGreen	= 0;
-               pConfigs[i].transparentBlue	= 0;
-               pConfigs[i].transparentAlpha	= 0;
-               pConfigs[i].transparentIndex	= 0;
-               i++;
-            }
-         }
-      }
-      if ( i != numConfigs ) {
-         xf86DrvMsg( pScrn->scrnIndex, X_ERROR,
-		     "[drm] Incorrect initialization of visuals\n" );
-         return FALSE;
-      }
-      break;
-
    case 32:
       numConfigs = 8;
 
@@ -224,21 +146,32 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
 	 pSAVAGEConfigPtrs[i] = &pSAVAGEConfigs[i];
       }
 
+      for (visNum = 0; SAVAGEVisuals[visNum].bpp != 0; visNum++) {
+         if ( SAVAGEVisuals[visNum].bpp == pScrn->bitsPerPixel )
+            break;
+      }
+      if ( SAVAGEVisuals[visNum].bpp == 0 ) {
+	 free( pConfigs );
+	 free( pSAVAGEConfigs );
+         return FALSE;
+      }
+
       i = 0;
       for ( accum = 0 ; accum <= 1 ; accum++ ) {
          for ( stencil = 0 ; stencil <= 1 ; stencil++ ) {
             for ( db = 1 ; db >= 0 ; db-- ) {
-               pConfigs[i].vid			= -1;
-               pConfigs[i].class		= -1;
-               pConfigs[i].rgba			= TRUE;
-               pConfigs[i].redSize		= 8;
-               pConfigs[i].greenSize		= 8;
-               pConfigs[i].blueSize		= 8;
-               pConfigs[i].alphaSize		= 0;
-               pConfigs[i].redMask		= 0x00FF0000;
-               pConfigs[i].greenMask		= 0x0000FF00;
-               pConfigs[i].blueMask		= 0x000000FF;
-               pConfigs[i].alphaMask		= 0;
+               pConfigs[i].vid		= -1;
+               pConfigs[i].class	= -1;
+               pConfigs[i].rgba		= TRUE;
+               pConfigs[i].redSize	= SAVAGEVisuals[visNum].redSize;
+               pConfigs[i].greenSize	= SAVAGEVisuals[visNum].greenSize;
+               pConfigs[i].blueSize	= SAVAGEVisuals[visNum].blueSize;
+               pConfigs[i].alphaSize	= SAVAGEVisuals[visNum].alphaSize;
+               pConfigs[i].redMask	= SAVAGEVisuals[visNum].redMask;
+               pConfigs[i].greenMask	= SAVAGEVisuals[visNum].greenMask;
+               pConfigs[i].blueMask	= SAVAGEVisuals[visNum].blueMask;
+               pConfigs[i].alphaMask	= SAVAGEVisuals[visNum].alphaMask;
+
                if ( accum ) {
                   pConfigs[i].accumRedSize	= 16;
                   pConfigs[i].accumGreenSize	= 16;
@@ -254,24 +187,27 @@ static Bool SAVAGEInitVisualConfigs( ScreenPtr pScreen )
                   pConfigs[i].doubleBuffer	= TRUE;
                } else {
                   pConfigs[i].doubleBuffer	= FALSE;
-	       }
+               }
                pConfigs[i].stereo		= FALSE;
-               pConfigs[i].bufferSize		= 32;
+               pConfigs[i].bufferSize		= pScrn->bitsPerPixel;
+               pConfigs[i].depthSize	= SAVAGEVisuals[visNum].depthSize;
                if ( stencil ) {
-		     pConfigs[i].depthSize	= 24;
-                     pConfigs[i].stencilSize	= 8;
+                  pConfigs[i].stencilSize	= 8;
+               } else {
+                  pConfigs[i].stencilSize	= 0;
                }
-               else {
-                     pConfigs[i].depthSize	= 24;
-                     pConfigs[i].stencilSize	= 0;
-               }
+
                pConfigs[i].auxBuffers		= 0;
                pConfigs[i].level		= 0;
-               if ( accum ) {
+
+               pConfigs[i].visualRating	= GLX_NONE;
+               if ( pScrn->bitsPerPixel == 16 ) {
+                  if ( accum || stencil ) {
+                     pConfigs[i].visualRating	= GLX_SLOW_CONFIG;
+                  }
+               } else if ( accum ) {
                   pConfigs[i].visualRating	= GLX_SLOW_VISUAL_EXT;
-               } else {
-                  pConfigs[i].visualRating	= GLX_NONE;
-	       }
+               }
                pConfigs[i].transparentPixel	= GLX_NONE;
                pConfigs[i].transparentRed	= 0;
                pConfigs[i].transparentGreen	= 0;
