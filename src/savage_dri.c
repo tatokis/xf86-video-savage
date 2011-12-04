@@ -34,7 +34,6 @@
 #include "xaalocal.h"
 #include "xaarop.h"
 
-#include "xf86PciInfo.h"
 #include "xf86Pci.h"
 #include "xf86fbman.h"
 

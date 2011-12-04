@@ -56,6 +56,7 @@
 #include "xf86xv.h"
 
 #include "savage_driver.h"
+#include "savage_pciids.h"
 #include "savage_regs.h"
 #include "savage_bci.h"
 #include "savage_streams.h"
