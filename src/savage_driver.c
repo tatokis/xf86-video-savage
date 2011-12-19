@@ -2163,10 +2163,10 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	} else {
 	    modName = "xaa";
 	    if( !xf86LoadSubModule(pScrn, modName) ) {
-	    	SavageFreeRec(pScrn);
-	    	vbeFree(psav->pVbe);
-	    	psav->pVbe = NULL;
-	    	return FALSE;
+		xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+			   "Falling back to shadowfb\n");
+		psav->NoAccel = 1;
+		psav->shadowFB = 1;
 	    } 
 	}
     }
