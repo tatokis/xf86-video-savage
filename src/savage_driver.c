@@ -1188,6 +1188,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     psav = SAVPTR(pScrn);
 
     hwp = VGAHWPTR(pScrn);
+    vgaHWSetStdFuncs(hwp);
     vgaHWGetIOBase(hwp);
     psav->vgaIOBase = hwp->IOBase;
 
