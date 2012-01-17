@@ -70,7 +70,11 @@
 #include "savage_regs.h"
 #include "savage_vbe.h"
 
-#ifdef XF86DRI
+#ifndef XF86DRI
+#undef SAVAGEDRI
+#endif
+
+#ifdef SAVAGEDRI
 #define _XF86DRI_SERVER_
 #include "savage_dripriv.h"
 #include "savage_dri.h"
@@ -457,7 +461,7 @@ typedef struct _Savage {
      int                 overlayDepth;
      int			primStreamBpp;
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     int 		LockHeld;
     Bool 		directRenderingEnabled;
     DRIInfoPtr 		pDRIInfo;
@@ -547,7 +551,7 @@ typedef struct _Savage {
 #define writescan savagewritescan
 
 /* add for support DRI */
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 
 #define SAVAGE_FRONT	0x1
 #define SAVAGE_BACK	0x2

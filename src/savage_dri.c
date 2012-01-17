@@ -26,7 +26,7 @@
 #include "config.h"
 #endif
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 
 #include "xf86.h"
 #include "xf86_OSproc.h"

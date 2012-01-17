@@ -67,7 +67,7 @@
 
 #define TRANSPARENCY_KEY 0xff;
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 #define _XF86DRI_SERVER_
 #include "savage_dri.h"
 #include "savage_sarea.h"
@@ -130,7 +130,7 @@ static unsigned int SavageDDC1Read(ScrnInfoPtr pScrn);
 static void SavageProbeDDC(ScrnInfoPtr pScrn, int index);
 static void SavageGetTvMaxSize(SavagePtr psav);
 static Bool SavagePanningCheck(ScrnInfoPtr pScrn, DisplayModePtr pMode);
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn);
 #endif
 static void SavageResetStreams(ScrnInfoPtr pScrn);
@@ -315,7 +315,7 @@ static const OptionInfoRec SavageOptions[] =
     { OPTION_BCI_FOR_XV,   "BCIforXv",    OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_DVI,          "DVI",       OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_IGNORE_EDID,  "IgnoreEDID",  OPTV_BOOLEAN, {0}, FALSE },
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     { OPTION_BUS_TYPE,	"BusType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_DMA_TYPE,	"DmaType",	OPTV_ANYSTR,  {0}, FALSE },
     { OPTION_DMA_MODE,  "DmaMode",	OPTV_ANYSTR,  {0}, FALSE },
@@ -1461,7 +1461,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     /* Set AGP Mode from config */
     /* We support 1X 2X and 4X  */
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 #ifdef XSERVER_LIBPCIACCESS
     /* Try to read the AGP capabilty block from the device.  If there is
      * no AGP info, the device is PCI.
@@ -1672,7 +1672,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
                    "Option: %s Tile Mode and Program it \n",(psav->bDisableTile?"Disable":"Enable"));
     }
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     /* disabled by default...doesn't seem to work */
     psav->bDisableXvMC = TRUE; /* if you want to free up more mem for DRI,etc. */
     if (xf86GetOptValBool(psav->Options, OPTION_DISABLE_XVMC, &psav->bDisableXvMC)) {
@@ -1702,7 +1702,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
                    "%s DVI port support (Savage4 only)\n",(psav->dvi?"Force":"Disable"));
     }
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     psav->AGPforXv = FALSE;
     if (xf86GetOptValBool(psav->Options, OPTION_AGP_FOR_XV, &psav->AGPforXv)) {
         if (psav->AGPforXv) {
@@ -2201,7 +2201,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 static Bool SavageEnterVT(int scrnIndex, int flags)
 {
     ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     SavagePtr psav = SAVPTR(pScrn);
     ScreenPtr pScreen;
 #endif
@@ -2211,7 +2211,7 @@ static Bool SavageEnterVT(int scrnIndex, int flags)
     gpScrn = pScrn;
     SavageEnableMMIO(pScrn);
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         pScreen = screenInfo.screens[scrnIndex];
         SAVAGEDRIResume(pScreen);
@@ -2239,14 +2239,14 @@ static void SavageLeaveVT(int scrnIndex, int flags)
     SavagePtr psav = SAVPTR(pScrn);
     vgaRegPtr vgaSavePtr = &hwp->SavedReg;
     SavageRegPtr SavageSavePtr = &psav->SavedReg;
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     ScreenPtr pScreen;
 #endif
 
     TRACE(("SavageLeaveVT(%d)\n", flags));
     gpScrn = pScrn;
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         pScreen = screenInfo.screens[scrnIndex];
         DRILock(pScreen, 0);
@@ -2459,7 +2459,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
     
     TRACE(("SavageWriteMode(%x)\n", restore->mode));
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         DRILock(screenInfo.screens[pScrn->scrnIndex], 0);
         psav->LockHeld = 1;
@@ -2652,7 +2652,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
 	SavageSetGBD(pScrn);
 
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     	if (psav->directRenderingEnabled)
     	    DRIUnlock(screenInfo.screens[pScrn->scrnIndex]);
     	psav->LockHeld = 0;
@@ -2908,7 +2908,7 @@ static void SavageWriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr,
     vgaHWProtect(pScrn, FALSE);
 
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled)
         DRIUnlock(screenInfo.screens[pScrn->scrnIndex]);
     psav->LockHeld = 0;
@@ -3114,7 +3114,7 @@ static void SavageUnmapMem(ScrnInfoPtr pScrn, int All)
     return;
 }
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 static Bool SavageCheckAvailableRamFor3D(ScrnInfoPtr pScrn)
 {
     SavagePtr psav = SAVPTR(pScrn);
@@ -3258,7 +3258,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
 
     vgaHWBlankScreen(pScrn, TRUE);
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (!xf86ReturnOptValBool(psav->Options, OPTION_DRI, TRUE)) {
 	psav->directRenderingEnabled = FALSE;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
@@ -3472,7 +3472,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     if (xf86DPMSInit(pScreen, SavageDPMS, 0) == FALSE)
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "DPMS initialization failed\n");
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         /* complete the DRI setup.*/
         psav->directRenderingEnabled = SAVAGEDRIFinishScreenInit(pScreen);
@@ -3503,7 +3503,7 @@ static Bool SavageScreenInit(int scrnIndex, ScreenPtr pScreen,
     }
 #endif
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if ((psav->directRenderingEnabled) && (!psav->bDisableXvMC)) {
         if (SAVAGEInitMC(pScreen))
             xf86DrvMsg(pScrn->scrnIndex,X_CONFIG,"XvMC is enabled\n");
@@ -3979,7 +3979,7 @@ static Bool SavageCloseScreen(int scrnIndex, ScreenPtr pScreen)
 
     TRACE(("SavageCloseScreen\n"));
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         SAVAGEDRICloseScreen(pScreen);
 	/* reset shadow values */

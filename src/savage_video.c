@@ -247,7 +247,7 @@ typedef struct {
    void         *video_planarmem;		/* opaque memory management information structure */
    CARD32       video_planarbuf; 		/* offset in video memory of planar YV12 buffer */
    
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
    Bool         tried_agp;			/* TRUE if AGP allocation has been tried */
    CARD32	agpBase;			/* Physical address of aperture base */
    CARD32	agpBufferOffset;		/* Offset of buffer in AGP memory, or 0 if unavailable */
@@ -1047,7 +1047,7 @@ SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
       /*SavageClipVWindow(pScrn);*/
  	SavageStreamsOff( pScrn );
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 	if (pPriv->agpBufferMap != NULL) {
 	    SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
 
@@ -1978,7 +1978,7 @@ SavagePutImage(
 
     /* Check whether AGP buffers can be allocated. If not, fall back to ordinary
        upload to framebuffer (slower) */
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (!pPriv->tried_agp && !psav->IsPCI && psav->drmFD > 0 && psav->DRIServerInfo != NULL) {
 	SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
         
@@ -2014,7 +2014,7 @@ SavagePutImage(
 	    pPriv->agpBufferOffset = 0;
 	}
     }
-#endif /* XF86DRI */
+#endif /* SAVAGEDRI */
 
 
     /* Buffer for final packed frame */
@@ -2060,7 +2060,7 @@ SavagePutImage(
 	offsetV += tmp;
 	nlines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
         if (S3_SAVAGE4_SERIES(psav->Chipset) && psav->BCIforXv && (npixels & 0xF) == 0 && pPriv->video_planarbuf != 0) {
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
             if (pPriv->agpBufferMap != NULL) {
 		/* Using copy to AGP memory */
 		SavageCopyPlanarDataBCI(
@@ -2073,7 +2073,7 @@ SavagePutImage(
 		    pPriv->agpBase + pPriv->agpBufferOffset,
 		    srcPitch, srcPitch2, dstPitch, nlines, npixels, TRUE);
             } else
-#endif /* XF86DRI */
+#endif /* SAVAGEDRI */
             {
 		/* Using ordinary copy to framebuffer */
 		SavageCopyPlanarDataBCI(

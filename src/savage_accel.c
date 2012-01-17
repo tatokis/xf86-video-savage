@@ -24,7 +24,7 @@
 #include "savage_bci.h"
 #include "savage_streams.h"
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
 #define _XF86DRI_SERVER_
 #include "savage_dri.h"
 #endif
@@ -1277,7 +1277,7 @@ SavageInitAccel(ScreenPtr pScreen)
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SavagePtr psav = SAVPTR(pScrn);
 
-#ifdef XF86DRI
+#ifdef SAVAGEDRI
     if (psav->directRenderingEnabled) {
         SAVAGEDRIServerPrivatePtr pSAVAGEDRIServer = psav->DRIServerInfo;
         int cpp = pScrn->bitsPerPixel / 8;
