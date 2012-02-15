@@ -625,6 +625,7 @@ ModeStatus SavageMatchBiosMode(ScrnInfoPtr pScrn,int width,int height,int refres
 
 unsigned short SavageGetBIOSModes( 
     SavagePtr psav,
+    VbeInfoBlock *vbe,
     int iDepth,
     SavageModeEntryPtr s3vModeTable );
 
