@@ -202,7 +202,7 @@ SECOND_PASS:
 Bool
 SavageDGAInit(ScreenPtr pScreen)
 {   
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
     SavagePtr psav = SAVPTR(pScrn);
     DGAModePtr modes = NULL;
     int num = 0;
@@ -276,7 +276,7 @@ Savage_SetMode(
 	pScrn->currentMode = OldMode[index];
 
 	psav->DGAactive = FALSE;
-	SavageSwitchMode(index, pScrn->currentMode, 0);
+	SavageSwitchMode(SWITCH_MODE_ARGS(pScrn, pScrn->currentMode));
 	if( psav->hwcursor && psav->hwc_on )
 	    SavageShowCursor(pScrn);
     } else {
@@ -312,7 +312,7 @@ Savage_SetMode(
 	    (pMode->bitsPerPixel >> 3);
 
 /*	psav->UseBIOS = FALSE; */
-	SavageSwitchMode(index, pMode->mode, 0);
+	SavageSwitchMode(SWITCH_MODE_ARGS(pScrn, pMode->mode));
 	psav->UseBIOS = holdBIOS;
     }
 
@@ -337,7 +337,7 @@ Savage_SetViewport(
 ){
     SavagePtr psav = SAVPTR(pScrn);
 
-    SavageAdjustFrame(pScrn->pScreen->myNum, x, y, flags);
+    SavageAdjustFrame(ADJUST_FRAME_ARGS(pScrn, x, y));
     psav->DGAViewportStatus = 0;  /* MGAAdjustFrame loops until finished */
 }
 

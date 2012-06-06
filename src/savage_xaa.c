@@ -151,7 +151,7 @@ void SavageRestoreAccelState(ScrnInfoPtr pScrn)
 Bool 
 SavageXAAInit(ScreenPtr pScreen)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
     SavagePtr psav = SAVPTR(pScrn);
     XAAInfoRecPtr xaaptr;
     BoxRec AvailFBArea;

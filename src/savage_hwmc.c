@@ -181,7 +181,7 @@ static XF86MCAdaptorPtr ppAdapt[1] =
  **************************************************************************/
 Bool SAVAGEInitMC(ScreenPtr pScreen)
 {
-  ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+  ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);
   SavagePtr pSAVAGE = SAVPTR(pScrn);
   DRIInfoPtr pDRIInfo = pSAVAGE->pDRIInfo;
   SAVAGEDRIPtr pSAVAGEDriPriv = (SAVAGEDRIPtr)pDRIInfo->devPrivate;
