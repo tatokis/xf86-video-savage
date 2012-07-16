@@ -63,7 +63,10 @@
 #include "fboverlay.h"
 #include "xf86cmap.h"
 #include "vbe.h"
+#ifdef HAVE_XAA_H
 #include "xaa.h"
+#endif
+#include "xf86fbman.h"
 #include "exa.h"
 #include "xf86xv.h"
 
@@ -421,7 +424,9 @@ typedef struct _Savage {
     unsigned long	sbd_high;
 
     /* Support for XAA acceleration */
+#ifdef HAVE_XAA_H
     XAAInfoRecPtr	AccelInfoRec;
+#endif
     xRectangle		Rect;
     unsigned int	SavedBciCmd;
     unsigned int	SavedFgColor;

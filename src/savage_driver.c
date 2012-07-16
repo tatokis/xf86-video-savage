@@ -3987,10 +3987,12 @@ static Bool SavageCloseScreen(CLOSE_SCREEN_ARGS_DECL)
 	psav->EXADriverPtr = NULL;
     }
 
+#ifdef HAVE_XAA_H
     if( psav->AccelInfoRec ) {
         XAADestroyInfoRec( psav->AccelInfoRec );
 	psav->AccelInfoRec = NULL;
     }
+#endif
 
     if( psav->DGAModes ) {
 	free( psav->DGAModes );
