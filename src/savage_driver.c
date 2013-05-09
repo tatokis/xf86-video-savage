@@ -2243,7 +2243,7 @@ static void SavageLeaveVT(VT_FUNC_ARGS_DECL)
     ScreenPtr pScreen;
 #endif
 
-    TRACE(("SavageLeaveVT(%d)\n", flags));
+    TRACE(("SavageLeaveVT()\n"));
     gpScrn = pScrn;
 
 #ifdef SAVAGEDRI
