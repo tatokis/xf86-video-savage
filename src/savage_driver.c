@@ -1266,8 +1266,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     if(!psav->NoAccel) {
         from = X_DEFAULT;
 	char *strptr;
-        if((strptr = (char *)xf86GetOptValString(psav->Options, OPTION_ACCELMETHOD))) {
 #ifdef HAVE_XAA_H
+        if((strptr = (char *)xf86GetOptValString(psav->Options, OPTION_ACCELMETHOD))) {
 	    if(!xf86NameCmp(strptr,"XAA")) {
 	        from = X_CONFIG;
 	        psav->useEXA = FALSE;
@@ -1275,10 +1275,10 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 	       from = X_CONFIG;
 	       psav->useEXA = TRUE;
 	    }
+        }
 #else
-	    psav->useEXA = TRUE;
+	psav->useEXA = TRUE;
 #endif
-       }
        xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
 		psav->useEXA ? "EXA" : "XAA");
     }
