@@ -1082,7 +1082,7 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     MessageType from = X_DEFAULT;
     int i;
     ClockRangePtr clockRanges;
-    char *s = NULL;
+    const char *s = NULL;
     unsigned char config1, m, n, n1, n2, sr8, cr66 = 0, tmp;
     int mclk;
     vgaHWPtr hwp;
