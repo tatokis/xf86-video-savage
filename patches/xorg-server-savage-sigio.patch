@@ -1,0 +1,12 @@
+diff -u -r xorg-server-1.20.0/hw/xfree86/common/xf86Config.c ../../trunk_working/src/xorg-server-1.20.0/hw/xfree86/common/xf86Config.c
+--- xorg-server-1.20.0/hw/xfree86/common/xf86Config.c	2018-06-19 15:06:19.051187971 +0300
++++ ../../trunk_working/src/xorg-server-1.20.0/hw/xfree86/common/xf86Config.c	2018-06-19 15:02:46.954574622 +0300
+@@ -833,6 +833,8 @@
+         }
+     }
+ 
++    xf86Info.useSIGIO = 1;
++
+     {
+         if ((s = xf86GetOptValString(FlagOptions, FLAG_RENDER_COLORMAP_MODE))) {
+             int policy = PictureParseCmapPolicy(s);
