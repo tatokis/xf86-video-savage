@@ -300,12 +300,16 @@ SavageSetCursorColors(
     int fg)
 {
     SavagePtr psav = SAVPTR(pScrn);
+#if 0
     Bool bNeedExtra = FALSE;
+#endif
 
     /* Clock doubled modes need an extra cursor stack write. */
 
+#if 0
     bNeedExtra =
         (psav->CursorInfoRec->Flags & HARDWARE_CURSOR_TRUECOLOR_AT_8BPP);
+#endif
 
     /* With the streams engine on HW Cursor seems to be 24bpp ALWAYS */
     if( 1 

@@ -1780,12 +1780,19 @@ SavageDisplayVideo2000(
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     /*DisplayModePtr mode = pScrn->currentMode;*/
     SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
+#if 0
     int vgaCRIndex, vgaCRReg, vgaIOBase;
-    CARD32 addr0, addr1, addr2;
+#endif
+    CARD32 addr0;
+#if 0
+    CARD32 addr1, addr2;
+#endif
 
+#if 0
     vgaIOBase = hwp->IOBase;
     vgaCRIndex = vgaIOBase + 4;
     vgaCRReg = vgaIOBase + 5;
+#endif
 
 
     if( psav->videoFourCC != id )
@@ -1833,8 +1840,10 @@ SavageDisplayVideo2000(
      */
 
     addr0 = offset + (x1>>15); /* Y in YCbCr420 */
+#if 0
     addr1 = addr0 + (width * height); /* Cb in in YCbCr420 */
     addr2 = addr1 + ((width * height) / 4); /* Cr in in YCbCr420 */
+#endif
     OUTREG(SEC_STREAM_FBUF_ADDR0, (addr0) & (0x3fffff & ~BASE_PAD));
 #if 0
     OUTREG(SEC_STREAM_FBUF_ADDR1, (addr1) & (0x3fffff & ~BASE_PAD));
@@ -1903,7 +1912,7 @@ SavagePutImage(
     ScreenPtr pScreen = pScrn->pScreen;
     INT32 x1, x2, y1, y2;
     unsigned char *dst_start;
-    int pitch, new_size, offset, offsetV=0, offsetU=0;
+    int new_size, offset, offsetV=0, offsetU=0;
     int srcPitch, srcPitch2=0, dstPitch;
     int planarFrameSize;
     int top, left, npixels, nlines;
@@ -1938,8 +1947,6 @@ SavagePutImage(
     dstBox.x2 -= pScrn->frameX0;
     dstBox.y1 -= pScrn->frameY0;
     dstBox.y2 -= pScrn->frameY0;
-
-    pitch = pScrn->bitsPerPixel * pScrn->displayWidth >> 3;
 
     /* All formats directly displayable by Savage are packed and 2 bytes per pixel */
     dstPitch = ((width << 1) + 15) & ~15;
@@ -2192,7 +2199,7 @@ SavageAllocateSurface(
     XF86SurfacePtr surface
 ){
     int offset, size;
-    int pitch, fbpitch, numlines;
+    int pitch;
     void *surface_memory = NULL;
     OffscreenPrivPtr pPriv;
 
@@ -2201,8 +2208,6 @@ SavageAllocateSurface(
 
     w = (w + 1) & ~1;
     pitch = ((w << 1) + 15) & ~15;
-    fbpitch = pScrn->bitsPerPixel * pScrn->displayWidth >> 3;
-    numlines = ((pitch * h) + fbpitch - 1) / fbpitch;
     size = pitch * h;
 
     offset = SavageAllocateMemory(pScrn, &surface_memory, size);
