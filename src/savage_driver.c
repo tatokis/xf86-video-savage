@@ -1265,8 +1265,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     if(!psav->NoAccel) {
         from = X_DEFAULT;
-	char *strptr;
 #ifdef HAVE_XAA_H
+        char *strptr;
         if((strptr = (char *)xf86GetOptValString(psav->Options, OPTION_ACCELMETHOD))) {
 	    if(!xf86NameCmp(strptr,"XAA")) {
 	        from = X_CONFIG;

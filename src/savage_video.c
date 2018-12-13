@@ -1037,7 +1037,9 @@ static void
 SavageStopVideo(ScrnInfoPtr pScrn, pointer data, Bool shutdown)
 {
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
+#ifdef SAVAGEDRI
     SavagePtr psav = SAVPTR(pScrn);
+#endif
 
     xf86ErrorFVerb(XVTRACE,"SavageStopVideo\n");
 
@@ -1777,7 +1779,9 @@ SavageDisplayVideo2000(
     short drw_w, short drw_h
 ){
     SavagePtr psav = SAVPTR(pScrn);
+#if 0
     vgaHWPtr hwp = VGAHWPTR(pScrn);
+#endif
     /*DisplayModePtr mode = pScrn->currentMode;*/
     SavagePortPrivPtr pPriv = psav->adaptor->pPortPrivates[0].ptr;
 #if 0
@@ -1909,7 +1913,9 @@ SavagePutImage(
 ){
     SavagePortPrivPtr pPriv = (SavagePortPrivPtr)data;
     SavagePtr psav = SAVPTR(pScrn);
+#ifdef SAVAGEDRI
     ScreenPtr pScreen = pScrn->pScreen;
+#endif
     INT32 x1, x2, y1, y2;
     unsigned char *dst_start;
     int new_size, offset, offsetV=0, offsetU=0;
