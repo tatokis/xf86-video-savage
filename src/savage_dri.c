@@ -54,23 +54,6 @@
 #include "savage_dri.h"
 #include "savage_sarea.h"
 
-static struct {
-   int bpp;
-   int redSize;
-   int greenSize;
-   int blueSize;
-   int alphaSize;
-   int redMask;
-   int greenMask;
-   int blueMask;
-   int alphaMask;
-   int depthSize;
-} SAVAGEVisuals[] = {
-   { 16, 5, 6, 5, 0, 0x0000F800, 0x000007E0, 0x0000001F, 0, 16 },
-   { 32, 8, 8, 8, 0, 0x00FF0000, 0x0000FF00, 0x000000FF, 0, 24 },
-   {  0, 0, 0, 0, 0,          0,          0,          0, 0,  0 }
-};
-
 static char SAVAGEKernelDriverName[] = "savage";
 static char SAVAGEClientDriverName[] = "savage";
 

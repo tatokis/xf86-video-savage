@@ -24,7 +24,7 @@
 AC_PREREQ([2.60])
 AC_INIT([xf86-video-savage],
         [2.3.9],
-        [https://bugs.freedesktop.org/enter_bug.cgi?product=xorg],
+        [https://gitlab.freedesktop.org/xorg/driver/xf86-video-savage/issues],
         [xf86-video-savage])
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_HEADERS([config.h])
@@ -75,12 +75,18 @@ sdkdir=`$PKG_CONFIG --variable=sdkdir xorg-server`
 
 
 if test "$DRI" != no; then
-        AC_CHECK_FILE([${sdkdir}/dri.h],
-                      [have_dri_h="yes"], [have_dri_h="no"])
-        AC_CHECK_FILE([${sdkdir}/sarea.h],
-                      [have_sarea_h="yes"], [have_sarea_h="no"])
-        AC_CHECK_FILE([${sdkdir}/dristruct.h],
-                      [have_dristruct_h="yes"], [have_dristruct_h="no"])
+        if test "$cross_compiling" = "no" ; then
+                AC_CHECK_FILE([${sdkdir}/dri.h],
+                              [have_dri_h="yes"], [have_dri_h="no"])
+                AC_CHECK_FILE([${sdkdir}/sarea.h],
+                              [have_sarea_h="yes"], [have_sarea_h="no"])
+                AC_CHECK_FILE([${sdkdir}/dristruct.h],
+                              [have_dristruct_h="yes"], [have_dristruct_h="no"])
+        else
+                have_dri_h="yes"
+                have_sarea_h="yes"
+                have_dristruct_h="yes"
+        fi
 fi
 
 AC_MSG_CHECKING([whether to include DRI support])

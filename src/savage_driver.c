@@ -1269,8 +1269,8 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
 
     if(!psav->NoAccel) {
         from = X_DEFAULT;
-	char *strptr;
 #ifdef HAVE_XAA_H
+        char *strptr;
         if((strptr = (char *)xf86GetOptValString(psav->Options, OPTION_ACCELMETHOD))) {
 	    if(!xf86NameCmp(strptr,"XAA")) {
 	        from = X_CONFIG;
@@ -2038,10 +2038,6 @@ static Bool SavagePreInit(ScrnInfoPtr pScrn, int flags)
     xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "Detected current MCLK value of %1.3f MHz\n",
 	       mclk / 1000.0);
 
-#if 0
-    pScrn->maxHValue = 2048 << 3;	/* 11 bits of h_total 8-pixel units */
-    pScrn->maxVValue = 2048;		/* 11 bits of v_total */
-#endif
     pScrn->virtualX = pScrn->display->virtualX;
     pScrn->virtualY = pScrn->display->virtualY;
 
@@ -3642,6 +3638,14 @@ static ModeStatus SavageValidMode(SCRN_ARG_TYPE arg, DisplayModePtr pMode,
       ((pMode->HDisplay > psav->PanelX) ||
        (pMode->VDisplay > psav->PanelY)))
 	    return MODE_PANEL;
+
+    /* 11 bits of h_total 8-pixel units */
+    if (pMode->HTotal > (2048 << 3))
+	return MODE_BAD_HVALUE;
+
+    /* 11 bits of v_total */
+    if (pMode->VTotal > 2048)
+	return MODE_BAD_VVALUE;
 
     if (psav->UseBIOS) {
 	refresh = SavageGetRefresh(pMode);
